@@ -3,9 +3,9 @@
 Usage: uv run python -m src.ingest.explore
 """
 import pandas as pd
-import pyarrow.parquet as pq
 
-RAW_PATH = "data/raw/data/legi-latest/legi_code_du_travail/legi_code_du_travail_part_0.parquet"
+from src.ingest.common import load_chunks
+
 # On exclut les colonnes lourdes (embeddings, chunk_text) pour l'exploration.
 COLUMNS = [
     "chunk_id", "doc_id", "chunk_index", "status", "subtitles",
@@ -14,10 +14,6 @@ COLUMNS = [
 CHECKED_NUMBERS = ["L6222-1", "L6222-18", "L6222-35", "D6222-26"]
 # Partie 6 livre II (apprentissage): numéros L62xx, R62xx, D62xx.
 LIVRE_II_REGEX = r"^[LRD]62\d\d(?:-|$)"
-
-
-def load() -> pd.DataFrame:
-    return pq.read_table(RAW_PATH, columns=COLUMNS).to_pandas()
 
 
 def section(title: str) -> None:
@@ -59,7 +55,7 @@ def sample_livre_ii(df: pd.DataFrame, n: int = 20) -> None:
 
 
 def main() -> None:
-    df = load()
+    df = load_chunks(COLUMNS)
     counts(df)
     versions(df)
     sample_livre_ii(df)

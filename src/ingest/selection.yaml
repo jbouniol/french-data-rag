@@ -1,0 +1,40 @@
+# Règles de sélection du corpus. Seuls les articles VIGUEUR sont considérés.
+# Chaque règle = un nom, une description et au moins un critère:
+#   number_regex: regex sur le numéro (ex. L6222-35)
+#   subtitles_regex: regex sur la hiérarchie (espaces normalisés)
+#   exclude_subtitles_regex: exclut les articles dont la hiérarchie correspond
+# Si number_regex et subtitles_regex sont donnés, les deux doivent correspondre.
+# Un article déjà pris par une règle précédente n'est pas recompté.
+rules:
+  - name: apprentissage
+    description: Partie 6 livre II, apprentissage (législatif, réglementaire, décrets)
+    number_regex: '^[LRD]62\d\d-'
+
+  - name: contrat_professionnalisation
+    description: Partie 6 livre III titre II chapitre V (contrats de professionnalisation)
+    number_regex: '^[LRD]6325-'
+
+  - name: jeunes_travailleurs
+    description: Durée du travail, repos et travaux des jeunes travailleurs
+    subtitles_regex: 'jeunes travailleurs'
+
+  - name: conges_payes
+    description: Congés payés (hors caisses de congés, spécifiques BTP)
+    number_regex: '^[LRD]3141-'
+    exclude_subtitles_regex: 'Caisses de congés'
+
+  - name: periode_essai
+    description: Période d'essai
+    subtitles_regex: "Période d'essai"
+
+  - name: rupture_cdi
+    description: Démission, licenciement pour motif personnel (L/R/D 1231 et 1232)
+    number_regex: '^[LRD]123[12]-'
+
+  - name: rupture_cdd
+    description: Rupture du CDD (L/R/D 1243)
+    number_regex: '^[LRD]1243-'
+
+  - name: rupture_conventionnelle
+    description: Rupture conventionnelle individuelle (L1237-11 à L1237-19)
+    number_regex: '^[LRD]1237-1[1-9]'
