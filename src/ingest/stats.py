@@ -1,4 +1,4 @@
-"""Statistiques du corpus pour la data card (tokens BGE-M3, répartition par livre).
+"""Corpus statistics for the data card (BGE-M3 tokens, breakdown per book).
 
 Usage: uv run python -m src.ingest.stats
 """
@@ -21,11 +21,11 @@ def main() -> None:
     print(arts.tokens.describe(percentiles=[.5, .9, .99]).round(1))
     print(f"total tokens: {arts.tokens.sum()}")
     print(f"articles > 512 tokens: {(arts.tokens > 512).sum()}")
-    print("\nPar livre:")
+    print("\nPer book:")
     g = arts.groupby(["partie", "livre"]).tokens.agg(["count", "mean"]).round(0)
     print(g.to_string())
-    print(f"\nAvec nota: {(arts.nota != '').sum()}")
-    print(f"Partie législative: {arts.hierarchy.str.startswith('Partie législative').sum()}, "
+    print(f"\nWith nota: {(arts.nota != '').sum()}")
+    print(f"Législative: {arts.hierarchy.str.startswith('Partie législative').sum()}, "
           f"réglementaire: {arts.hierarchy.str.startswith('Partie réglementaire').sum()}")
 
 

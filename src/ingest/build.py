@@ -1,4 +1,4 @@
-"""Construit les fichiers de data/processed/ à partir du parquet brut.
+"""Build the data/processed/ files from the raw parquet.
 
 Usage: uv run python -m src.ingest.build
 """
@@ -29,8 +29,8 @@ PARTIE_RE = re.compile(r"^\w+ partie\b")
 def parse_hierarchy(subtitles: str) -> str:
     """'Partie législative - Sixième partie : … - Livre II : …' -> 'Partie législative > Sixième partie : … > Livre II : …'.
 
-    Garde code (législative/réglementaire), partie, livre, titre, chapitre.
-    Quand un niveau apparaît deux fois (renommage), on garde le dernier intitulé.
+    Keeps code (législative/réglementaire), partie, livre, titre, chapitre.
+    When a level appears twice (renamed), the last label wins.
     """
     levels: dict[str, str] = {}
     for part in re.split(r"\s+-\s+", normalize_subtitles(subtitles)):
@@ -50,7 +50,7 @@ def to_date(s: str) -> date:
 
 
 def build_articles(chunks: pd.DataFrame) -> pd.DataFrame:
-    """1 ligne par doc_id: texte reconstitué en concaténant les chunks dans l'ordre."""
+    """One row per doc_id: text rebuilt by concatenating the chunks in order."""
     chunks = chunks.sort_values(["doc_id", "chunk_index"])
     first = chunks.drop_duplicates("doc_id").set_index("doc_id")
     text = chunks.groupby("doc_id").text.agg("".join)
@@ -69,7 +69,7 @@ def build_articles(chunks: pd.DataFrame) -> pd.DataFrame:
 
 
 def build_baseline(doc_ids: set[str]) -> pd.DataFrame:
-    """Chunks DINUM (avec embeddings BGE-M3) des articles du corpus."""
+    """DINUM chunks (with BGE-M3 embeddings) of the corpus articles."""
     df = load_chunks(["chunk_id", "doc_id", "chunk_index", "number", "chunk_text", "embeddings_bge-m3"])
     df = df[df.doc_id.isin(doc_ids)].sort_values(["doc_id", "chunk_index"]).copy()
     df["embedding"] = df["embeddings_bge-m3"].map(json.loads)
@@ -83,7 +83,7 @@ def main() -> None:
     corpus_ids = set(selected.doc_id)
     corpus_nums = set(selected.number)
 
-    # MODIFIE_MORT_NE: modifiée avant son entrée en vigueur (date_fin < date_debut), jamais applicable.
+    # MODIFIE_MORT_NE: modified before it ever came into force (date_fin < date_debut), never applicable.
     kept = chunks[chunks.number.isin(corpus_nums) & (chunks.status != "MODIFIE_MORT_NE")]
     versions = build_articles(kept)
     versions["is_in_corpus"] = versions.doc_id.isin(corpus_ids)
@@ -96,7 +96,7 @@ def main() -> None:
     baseline.to_parquet(OUT_DIR / "dinum_baseline_chunks.parquet", index=False)
 
     print(f"\narticles.parquet: {len(corpus)} articles")
-    print(f"article_versions.parquet: {len(versions)} versions ({versions.num.nunique()} numéros)")
+    print(f"article_versions.parquet: {len(versions)} versions ({versions.num.nunique()} article numbers)")
     print(f"dinum_baseline_chunks.parquet: {len(baseline)} chunks")
 
 

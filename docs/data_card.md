@@ -1,59 +1,59 @@
-# Data card: corpus Code du travail (Alter-Ego)
+# Data card: Code du travail corpus (Alter-Ego)
 
 ## Source
-- Dataset Hugging Face [`AgentPublic/legi`](https://huggingface.co/datasets/AgentPublic/legi) (DINUM), issu de la base LEGI de la DILA.
-- Dossier utilisé: `data/legi-latest/legi_code_du_travail/` (1 fichier parquet, 262 Mo, 48 993 chunks, 47 777 articles toutes versions confondues).
-- **Licence**: Licence Ouverte Etalab 2.0 (réutilisation libre avec mention de la source).
-- **Date d'extraction**: téléchargé le 13/10/2026 depuis le snapshot `legi-latest`. La version en vigueur la plus récente du corpus date du 16/08/2026.
-- Les données ne sont jamais versionnées dans git (`data/` est ignoré). Reconstruction: `uv run python -m src.ingest.build`.
+- Hugging Face dataset [`AgentPublic/legi`](https://huggingface.co/datasets/AgentPublic/legi) (DINUM), derived from the DILA LEGI database.
+- Folder used: `data/legi-latest/legi_code_du_travail/` (1 parquet file, 262 MB, 48,993 chunks, 47,777 articles across all versions).
+- **Licence**: Licence Ouverte Etalab 2.0 (free reuse, with attribution).
+- **Extraction date**: downloaded on 2026-10-13 from the `legi-latest` snapshot. The most recent version in force in the corpus dates from 2026-08-16.
+- The data is never versioned in git (`data/` is ignored). Rebuild: `uv run python -m src.ingest.build`.
 
-## Contenu
-Environ 500 articles du Code du travail en vigueur, centrés sur l'**apprentissage** et les sujets voisins pour un alternant.
+## Content
+About 500 articles of the Code du travail in force, centred on **apprenticeship** and neighbouring topics for an apprentice.
 
-| Fichier | Contenu |
+| File | Content |
 |---|---|
-| `data/processed/articles.parquet` | **540 articles** `VIGUEUR`, 1 ligne = 1 article (le corpus de retrieval) |
-| `data/processed/article_versions.parquet` | 1 066 versions (dont les 540 en vigueur) des mêmes articles: `MODIFIE`, `ABROGE`, `TRANSFERE`. Hors corpus, pour répondre « à une date donnée » |
-| `data/processed/dinum_baseline_chunks.parquet` | 542 chunks DINUM + embeddings BGE-M3 des 540 articles. Baseline de comparaison uniquement |
+| `data/processed/articles.parquet` | **540 `VIGUEUR` articles**, 1 row = 1 article (the retrieval corpus) |
+| `data/processed/article_versions.parquet` | 1,066 versions (including the 540 in force) of the same articles: `MODIFIE`, `ABROGE`, `TRANSFERE`. Outside the corpus, to answer "at a given date" |
+| `data/processed/dinum_baseline_chunks.parquet` | 542 DINUM chunks + BGE-M3 embeddings of the 540 articles. Comparison baseline only |
 
-Colonnes de `articles.parquet` et `article_versions.parquet`: `doc_id` (LEGIARTI…), `num` (ex. `L6222-1`), `text`, `hierarchy`, `etat`, `date_debut`, `date_fin`, `url`, `nota`, `is_in_corpus`.
+Columns of `articles.parquet` and `article_versions.parquet`: `doc_id` (LEGIARTI…), `num` (e.g. `L6222-1`), `text`, `hierarchy`, `etat`, `date_debut`, `date_fin`, `url`, `nota`, `is_in_corpus`.
 
-## Règles de sélection
-Définies dans [`src/ingest/selection.yaml`](../src/ingest/selection.yaml). Seuls les articles `etat == VIGUEUR` sont retenus (les `VIGUEUR_DIFF`, en vigueur à une date future, sont exclus). Une règle ajoute les articles non déjà pris par les règles précédentes.
+## Selection rules
+Defined in [`src/ingest/selection.yaml`](../src/ingest/selection.yaml). Only `etat == VIGUEUR` articles are kept (`VIGUEUR_DIFF`, in force at a future date, are excluded). A rule adds the articles not already taken by the previous rules.
 
-| Règle | Critère | Articles ajoutés | Pourquoi |
+| Rule | Criterion | Articles added | Why |
 |---|---|---|---|
-| `apprentissage` | L/R/D 62xx (partie 6, livre II) | 301 | Cœur du sujet: contrat, formation, aides, rupture |
-| `contrat_professionnalisation` | L/R/D 6325 | 62 | L'autre contrat en alternance (le livre III entier est de la formation continue: 774 articles, trop large) |
-| `jeunes_travailleurs` | `subtitles` « jeunes travailleurs » | 37 | Durée du travail, repos, travaux interdits des moins de 18 ans |
-| `conges_payes` | L/R/D 3141, hors caisses de congés | 44 | Question fréquente; caisses de congés = BTP, hors sujet |
-| `periode_essai` | `subtitles` « Période d'essai » | 13 | Dont CDD, intérim, VRP |
-| `rupture_cdi` | L/R/D 1231 et 1232 | 35 | Démission, licenciement pour motif personnel |
-| `rupture_cdd` | L/R/D 1243 | 17 | Rupture du CDD |
-| `rupture_conventionnelle` | L1237-11 à L1237-19 | 31 | Rupture d'un commun accord |
+| `apprenticeship` | L/R/D 62xx (partie 6, livre II) | 301 | Core of the topic: contract, training, aid, termination |
+| `professionalization_contract` | L/R/D 6325 | 62 | The other work-study contract (the whole livre III is continuing training: 774 articles, too broad) |
+| `young_workers` | `subtitles` "jeunes travailleurs" | 37 | Working time, rest, forbidden work for under-18s |
+| `paid_leave` | L/R/D 3141, without leave funds | 44 | Frequent question; leave funds = construction, off topic |
+| `trial_period` | `subtitles` "Période d'essai" | 13 | Including CDD, temp work, VRP |
+| `cdi_termination` | L/R/D 1231 and 1232 | 35 | Resignation, dismissal for personal reasons |
+| `cdd_termination` | L/R/D 1243 | 17 | Termination of a CDD |
+| `mutual_termination` | L1237-11 to L1237-19 | 31 | Termination by mutual agreement |
 | **Total** | | **540** | |
 
-Le détail des observations est dans [`data_log.md`](data_log.md).
+The detailed observations are in [`data_log.md`](data_log.md).
 
-## Statistiques
-Tokens comptés avec le tokenizer BGE-M3 (`BAAI/bge-m3`, via `tokenizers`), sur le texte de l'article sans en-tête. Script: `uv run python -m src.ingest.stats`.
+## Statistics
+Tokens counted with the BGE-M3 tokenizer (`BAAI/bge-m3`, via `tokenizers`), on the article text without header. Script: `uv run python -m src.ingest.stats`.
 
-| | Valeur |
+| | Value |
 |---|---|
 | Articles | 540 (269 législatifs, 271 réglementaires) |
-| Tokens par article | moyenne 138, médiane 96, p90 282, p99 805, max 1 006 |
-| Total | ≈ 74 700 tokens |
+| Tokens per article | mean 138, median 96, p90 282, p99 805, max 1,006 |
+| Total | ≈ 74,700 tokens |
 | Articles > 512 tokens | 14 |
-| Articles avec `nota` | 97 |
+| Articles with `nota` | 97 |
 
-Répartition par livre:
+Breakdown per book:
 
-| Partie | Livre | Articles | Tokens moyens |
+| Partie | Livre | Articles | Mean tokens |
 |---|---|---|---|
 | 6 législative | II: L'apprentissage | 114 | 155 |
 | 6 réglementaire | II: L'apprentissage | 187 | 150 |
-| 6 législative | III: La formation professionnelle (chap. contrats de professionnalisation) | 26 | 137 |
-| 6 réglementaire | III: La formation professionnelle continue (idem) | 36 | 156 |
+| 6 législative | III: La formation professionnelle (chapter contrats de professionnalisation) | 26 | 137 |
+| 6 réglementaire | III: La formation professionnelle continue (same chapter) | 36 | 156 |
 | 1 législative | II: Le contrat de travail | 76 | 122 |
 | 1 réglementaire | II: Le contrat de travail | 19 | 121 |
 | 3 législative | I: Durée du travail, repos et congés | 52 | 111 |
@@ -61,20 +61,20 @@ Répartition par livre:
 | 4 réglementaire | I: Dispositions générales | 4 | 71 |
 | 7 législative | III: Voyageurs, représentants, placiers… | 1 | 25 |
 
-## Nettoyage et transformations
-- **Texte d'un article**: les chunks DINUM sont recollés par `chunk_index` (concaténation de la colonne `text`, sans l'en-tête ajouté dans `chunk_text`). 98,5 % des articles n'ont qu'un chunk.
-- **`hierarchy`**: obtenue en découpant `subtitles` sur ` - `, en normalisant les espaces. On garde code (législative/réglementaire), partie, livre, titre, chapitre. Les sections et sous-sections sont retirées. Si un niveau apparaît deux fois (renommage), on garde le dernier intitulé.
+## Cleaning and transformations
+- **Article text**: the DINUM chunks are glued back by `chunk_index` (concatenation of the `text` column, without the header added in `chunk_text`). 98.5% of articles have a single chunk.
+- **`hierarchy`**: obtained by splitting `subtitles` on ` - ` and normalising whitespace. We keep code (législative/réglementaire), partie, livre, titre, chapitre. Sections and sub-sections are dropped. If a level appears twice (renamed), the last label is kept.
 - **`url`**: `https://www.legifrance.gouv.fr/codes/article_lc/{doc_id}`.
-- **Dates**: `date_debut` / `date_fin` en dates. La version en vigueur a `date_fin = 2999-01-01`.
-- **Versions `MODIFIE_MORT_NE`** (14 pour les articles retenus) retirées de `article_versions.parquet`: modifiées avant leur entrée en vigueur, `date_fin` antérieure à `date_debut`, jamais applicables.
-- **Embeddings DINUM**: décodés (JSON → liste de floats). Ils ne servent que de baseline; l'index final utilise nos propres choix de découpage et d'embedding.
+- **Dates**: `date_debut` / `date_fin` as dates. The version in force has `date_fin = 2999-01-01`.
+- **`MODIFIE_MORT_NE` versions** (14 for the selected articles) removed from `article_versions.parquet`: modified before coming into force, `date_fin` earlier than `date_debut`, never applicable.
+- **DINUM embeddings**: decoded (JSON → list of floats). They only serve as a baseline; the final index uses our own chunking and embedding choices.
 
-## Limites connues
-- **Montant du SMIC absent**: il est fixé par décret hors Code du travail (seule la méthode de calcul est dedans). Le système doit répondre qu'il ne peut pas citer le montant.
-- **Un `doc_id` par version**: chaque version d'un article a son propre identifiant LEGIARTI. La clé stable entre versions est `num`.
-- **Trous dans l'historique**: pour 17 articles, il y a une période sans version (article abrogé puis recréé, ex. D6222-33 entre 2019 et 2020). À une date de cette période, aucun texte n'est applicable.
-- **Pas de conventions collectives ni de jurisprudence**: seules les règles du Code du travail sont couvertes.
-- **Périmètre thématique**: ni rupture pour faute grave ou licenciement économique, ni temps partiel, ni heures supplémentaires (hors jeunes). Le golden set doit rester dans le périmètre.
-- **Intitulé du livre III incohérent**: « La formation professionnelle » (législatif) contre « La formation professionnelle continue » (réglementaire) pour le même chapitre. Non harmonisé.
-- **Texte brut**: les renvois entre articles ne sont pas résolus, les tableaux éventuels sont aplatis en texte.
-- **Fraîcheur**: le corpus reflète `legi-latest` à la date d'extraction; les changements ultérieurs ne sont pas pris en compte.
+## Known limits
+- **SMIC amount missing**: it is set by a decree outside the Code du travail (only the calculation method is in it). The system must answer that it cannot quote the amount.
+- **One `doc_id` per version**: each version of an article has its own LEGIARTI identifier. The stable key across versions is `num`.
+- **Gaps in the history**: for 17 articles there is a period with no version (article repealed then recreated, e.g. D6222-33 between 2019 and 2020). At a date in that period, no text is applicable.
+- **No collective agreements or case law**: only the Code du travail rules are covered.
+- **Thematic scope**: no dismissal for serious misconduct or economic dismissal, no part-time work, no overtime (except for young workers). The golden set must stay in scope.
+- **Inconsistent livre III title**: "La formation professionnelle" (législatif) versus "La formation professionnelle continue" (réglementaire) for the same chapter. Not harmonised.
+- **Raw text**: cross-references between articles are not resolved, any tables are flattened into text.
+- **Freshness**: the corpus reflects `legi-latest` at the extraction date; later changes are not picked up.

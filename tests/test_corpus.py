@@ -1,4 +1,4 @@
-"""Vérifie les fichiers produits par `uv run python -m src.ingest.build`."""
+"""Check the files produced by `uv run python -m src.ingest.build`."""
 from datetime import date
 
 import pandas as pd

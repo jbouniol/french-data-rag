@@ -1,4 +1,4 @@
-"""Interface de l'agent (stub, implémenté par le chantier agent)."""
+"""Agent interface (stub, implemented by the agent workstream)."""
 from dataclasses import dataclass, field
 
 
@@ -16,5 +16,5 @@ class AnswerTrace:
 
 
 def answer(question: str) -> AnswerTrace:
-    """Répond à une question en s'appuyant sur le retrieval."""
+    """Answer a question using the retrieval."""
     raise NotImplementedError

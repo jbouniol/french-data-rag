@@ -1,4 +1,4 @@
-"""Stub du script d'évaluation (implémenté par le chantier eval)."""
+"""Evaluation script stub (implemented by the eval workstream)."""
 import argparse
 
 
@@ -7,7 +7,7 @@ def main() -> None:
     parser.add_argument("--questions", required=True)
     parser.add_argument("--out", required=True)
     parser.parse_args()
-    raise NotImplementedError("run_eval n'est pas encore implémenté")
+    raise NotImplementedError("run_eval is not implemented yet")
 
 
 if __name__ == "__main__":

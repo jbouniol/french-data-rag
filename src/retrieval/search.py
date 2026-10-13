@@ -1,4 +1,4 @@
-"""Interface de recherche (stub, implémenté par le chantier retrieval)."""
+"""Search interface (stub, implemented by the retrieval workstream)."""
 from dataclasses import dataclass, field
 
 
@@ -12,5 +12,5 @@ class Hit:
 
 
 def search(query: str, k: int = 10, filters: dict | None = None) -> list[Hit]:
-    """Retourne les k meilleurs chunks pour la requête, avec filtres optionnels."""
+    """Return the k best chunks for the query, with optional filters."""
     raise NotImplementedError
