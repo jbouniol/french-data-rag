@@ -1,0 +1,19 @@
+[project]
+name = "alter-ego"
+version = "0.1.0"
+description = "Alter-Ego: assistant RAG + agent sur le Code du travail (apprentissage)"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "huggingface-hub>=1.0",
+    "pandas>=2.2",
+    "pyarrow>=17",
+    "pyyaml>=6",
+    "tokenizers>=0.20",
+]
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
