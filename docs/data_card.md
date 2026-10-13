@@ -72,6 +72,7 @@ Répartition par livre:
 ## Limites connues
 - **Montant du SMIC absent**: il est fixé par décret hors Code du travail (seule la méthode de calcul est dedans). Le système doit répondre qu'il ne peut pas citer le montant.
 - **Un `doc_id` par version**: chaque version d'un article a son propre identifiant LEGIARTI. La clé stable entre versions est `num`.
+- **Trous dans l'historique**: pour 17 articles, il y a une période sans version (article abrogé puis recréé, ex. D6222-33 entre 2019 et 2020). À une date de cette période, aucun texte n'est applicable.
 - **Pas de conventions collectives ni de jurisprudence**: seules les règles du Code du travail sont couvertes.
 - **Périmètre thématique**: ni rupture pour faute grave ou licenciement économique, ni temps partiel, ni heures supplémentaires (hors jeunes). Le golden set doit rester dans le périmètre.
 - **Intitulé du livre III incohérent**: « La formation professionnelle » (législatif) contre « La formation professionnelle continue » (réglementaire) pour le même chapitre. Non harmonisé.

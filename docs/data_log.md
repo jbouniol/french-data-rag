@@ -17,7 +17,7 @@ Script: `src/ingest/explore.py`
 | 1.3 | 47 777 articles (`doc_id`), mais seulement 11 479 en `VIGUEUR`. Le reste: MODIFIE (20 056), ABROGE (13 922), etc. | Corpus = `VIGUEUR` seulement. Les autres versions vont dans `article_versions.parquet`. | Décidé |
 | 1.4 | 92 articles `VIGUEUR_DIFF` (en vigueur à une date future). | Les exclure: `etat == VIGUEUR` strict. | Décidé |
 | 1.5 | Chaque version d'un article a son propre `doc_id` (LEGIARTI…). Ex.: L6222-1 a 5 `doc_id`. | Garder `num` (ex. L6222-1) comme clé stable entre versions. Le noter dans la data card. | Fait |
-| 1.6 | La version en vigueur a `end_date = 2999-01-01`. Les versions se suivent sans trou. | Garder tel quel pour `get_article_at_date`. | Fait |
+| 1.6 | La version en vigueur a `end_date = 2999-01-01`. Les versions se suivent sans trou, sauf 17 cas (voir 3.8). | Garder tel quel pour `get_article_at_date`. | Fait |
 | 1.7 | 98,5 % des articles n'ont qu'un chunk. 710 en ont plusieurs (max 32). | 1 article = 1 unité de retrieval. Pour les longs, on garde les chunks DINUM. Le texte complet reste dans `articles.parquet`. | Décidé |
 | 1.8 | `chunk_index` commence à 1. `text` = fragment propre du chunk. `chunk_text` = en-tête + fragment. | Reconstituer l'article en concaténant `text` par `chunk_index`. Utiliser `chunk_text` pour la baseline DINUM. | Fait |
 | 1.9 | `subtitles` est irrégulier: espaces multiples, niveaux dupliqués après renommage, « Chapitre unique » sans titre. | Découper sur `\s+-\s+`, normaliser les espaces, garder le dernier intitulé quand un niveau est dupliqué. | Fait |
@@ -72,4 +72,4 @@ Fichiers: `src/ingest/build.py` (build), `src/ingest/stats.py` (stats), `tests/t
 | 3.5 | Tokens BGE-M3: moyenne 138, p99 805, max 1 006, seulement 14 articles > 512. | 1 article = 1 unité de retrieval est viable. Pas de re-découpage nécessaire. | Décidé |
 | 3.6 | Livre III de la partie 6: « La formation professionnelle » (législatif) et « …continue » (réglementaire) pour le même chapitre. | Non harmonisé. Noté dans la data card (limites). | Fait |
 | 3.7 | Le téléchargement du tokenizer BGE-M3 se bloque avec Xet (comme en 1.1). | Lancer `stats.py` avec `HF_HUB_DISABLE_XET=1`. | Fait |
-
+| 3.8 | Contrôle final: 17 articles ont un trou entre deux versions (version `ABROGE`, puis article recréé plus tard). Ex.: D6222-33 abrogé en 2019, de nouveau en vigueur en 2020. | Normal: à ces dates l'article n'existait pas. `get_article_at_date` doit renvoyer « aucun article applicable » et non la version voisine. Noté dans la data card. | Fait |
