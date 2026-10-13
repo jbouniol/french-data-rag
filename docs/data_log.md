@@ -14,12 +14,12 @@ Script: `src/ingest/explore.py`
 |---|---|---|---|
 | 1.1 | The Code du travail fits in a single parquet file (262 MB, 48,993 chunks). The "2.2 M rows" figure covers all the codes. | Download only `data/legi-latest/legi_code_du_travail/`. | Done |
 | 1.2 | The dataset has dated snapshots (`legi-20250905`, …, `legi-latest`). | Use `legi-latest`. Record the extraction date in the data card. | Done |
-| 1.3 | 47,777 articles (`doc_id`), but only 11,479 are `VIGUEUR`. The rest: MODIFIE (20,056), ABROGE (13,922), etc. | Corpus = `VIGUEUR` only. The other versions go to `article_versions.parquet`. | Decided |
-| 1.4 | 92 `VIGUEUR_DIFF` articles (in force at a future date). | Exclude them: strict `etat == VIGUEUR`. | Decided |
+| 1.3 | 47,777 articles (`doc_id`), but only 11,479 are `VIGUEUR`. The rest: MODIFIE (20,056), ABROGE (13,922), etc. | Corpus = `VIGUEUR` only. The other versions go to `article_versions.parquet`. | Done |
+| 1.4 | 92 `VIGUEUR_DIFF` articles (in force at a future date). | Exclude them: strict `etat == VIGUEUR`. | Done |
 | 1.5 | Each version of an article has its own `doc_id` (LEGIARTI…). E.g. L6222-1 has 5 `doc_id`s. | Keep `num` (e.g. L6222-1) as the stable key across versions. Note it in the data card. | Done |
 | 1.6 | The version in force has `end_date = 2999-01-01`. Versions follow each other without a gap, except 17 cases (see 3.8). | Keep as is for `get_article_at_date`. | Done |
-| 1.7 | 98.5% of articles have a single chunk. 710 have several (max 32). | 1 article = 1 retrieval unit. For long ones we keep the DINUM chunks. The full text stays in `articles.parquet`. | Decided |
-| 1.8 | `chunk_index` starts at 1. `text` = clean fragment of the chunk. `chunk_text` = header + fragment. | Rebuild the article by concatenating `text` by `chunk_index`. Use `chunk_text` for the DINUM baseline. | Done |
+| 1.7 | 98.5% of articles have a single chunk. 710 have several (max 32). | Rebuild full articles in `articles.parquet` (1 article = 1 retrieval unit, see 3.5). Keep the DINUM chunks in `dinum_baseline_chunks.parquet`. | Done |
+| 1.8 | `chunk_index` starts at 1. `text` = clean fragment of the chunk. `chunk_text` = header + fragment. | Rebuild the article by concatenating `text` by `chunk_index` (with `\n`). Use `chunk_text` for the DINUM baseline. | Done |
 | 1.9 | `subtitles` is irregular: repeated spaces, duplicated levels after renaming, "Chapitre unique" without a title. | Split on `\s+-\s+`, normalise spaces, keep the last label when a level is duplicated. | Done |
 | 1.10 | An old "Partie réglementaire ancienne" exists (D118, D322-…), almost entirely not in force. | The `VIGUEUR` filter drops it. Select by `number` prefix, not by `subtitles` alone. | Done |
 | 1.11 | Partie 6 livre II (L/R/D 62xx): 1,171 versions, **301 `VIGUEUR`**. | Add other rules to reach ~500 (step 2). | Done |
@@ -69,7 +69,7 @@ Files: `src/ingest/build.py` (build), `src/ingest/stats.py` (stats), `tests/test
 | 3.2 | Parsed `subtitles`: 536 articles have 4 levels (partie, livre, titre, chapitre), 4 have no chapitre. | `hierarchy` = "code > partie > livre > titre > chapitre". Sections and sub-sections dropped. | Done |
 | 3.3 | **14 `MODIFIE_MORT_NE` versions** have `date_fin` < `date_debut` (modified before coming into force). Found by the dates test. | Drop them from `article_versions.parquet` (1,066 versions in the end). | Done |
 | 3.4 | 97 articles have a `nota` (application details). | `nota` column added to `articles.parquet`. | Done |
-| 3.5 | BGE-M3 tokens: mean 138, p99 805, max 1,006, only 14 articles > 512. | 1 article = 1 retrieval unit is viable. No re-chunking needed. | Decided |
+| 3.5 | BGE-M3 tokens: mean 138, p99 805, max 1,006, only 14 articles > 512. | 1 article = 1 retrieval unit is viable. No re-chunking needed. | Done |
 | 3.6 | Livre III of partie 6: "La formation professionnelle" (législatif) and "…continue" (réglementaire) for the same chapter. | Not harmonised. Noted in the data card (limits). | Done |
-| 3.7 | Downloading the BGE-M3 tokenizer stalls with Xet (as in 1.1). | Run `stats.py` with `HF_HUB_DISABLE_XET=1`. | Done |
+| 3.7 | Downloading the BGE-M3 tokenizer stalls with Xet (as in 1.1). | Set `HF_HUB_DISABLE_XET=1` by default in `stats.py`. | Done |
 | 3.8 | Final check: 17 articles have a gap between two versions (an `ABROGE` version, then the article is recreated later). E.g. D6222-33 repealed in 2019, back in force in 2020. | Expected: on those dates the article did not exist. `get_article_at_date` must return "no applicable article", not the neighbouring version. Noted in the data card. | Done |

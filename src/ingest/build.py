@@ -13,7 +13,6 @@ from src.ingest.common import load_chunks
 from src.ingest.select import load_rules, normalize_subtitles, select_articles
 
 OUT_DIR = Path("data/processed")
-URL = "https://www.legifrance.gouv.fr/codes/article_lc/{doc_id}"
 CHUNK_COLUMNS = [
     "doc_id", "chunk_index", "status", "number", "subtitles",
     "start_date", "end_date", "nota", "text",
@@ -45,39 +44,31 @@ def parse_hierarchy(subtitles: str) -> str:
     return " > ".join(levels[k] for k in order if k in levels)
 
 
-def to_date(s: str) -> date:
-    return date.fromisoformat(s[:10])
-
-
 def build_articles(chunks: pd.DataFrame) -> pd.DataFrame:
     """One row per doc_id: text rebuilt by concatenating the chunks in order."""
     chunks = chunks.sort_values(["doc_id", "chunk_index"])
-    first = chunks.drop_duplicates("doc_id").set_index("doc_id")
-    text = chunks.groupby("doc_id").text.agg("".join)
-    arts = pd.DataFrame({
-        "doc_id": first.index,
-        "num": first.number.values,
-        "text": text.loc[first.index].values,
-        "hierarchy": first.subtitles.map(parse_hierarchy).values,
-        "etat": first.status.values,
-        "date_debut": first.start_date.map(to_date).values,
-        "date_fin": first.end_date.map(to_date).values,
-        "nota": first.nota.fillna("").values,
-    })
-    arts["url"] = arts.doc_id.map(lambda d: URL.format(doc_id=d))
+    arts = chunks.drop_duplicates("doc_id").rename(
+        columns={"number": "num", "status": "etat"}
+    ).copy()
+    arts["text"] = chunks.groupby("doc_id", sort=False).text.agg("\n".join).values
+    arts["hierarchy"] = arts.subtitles.map(parse_hierarchy)
+    arts["date_debut"] = arts.start_date.map(date.fromisoformat)
+    arts["date_fin"] = arts.end_date.map(date.fromisoformat)
+    arts["nota"] = arts.nota.fillna("")
+    arts["url"] = "https://www.legifrance.gouv.fr/codes/article_lc/" + arts.doc_id
     return arts.reset_index(drop=True)
 
 
 def build_baseline(doc_ids: set[str]) -> pd.DataFrame:
     """DINUM chunks (with BGE-M3 embeddings) of the corpus articles."""
-    df = load_chunks(["chunk_id", "doc_id", "chunk_index", "number", "chunk_text", "embeddings_bge-m3"])
-    df = df[df.doc_id.isin(doc_ids)].sort_values(["doc_id", "chunk_index"]).copy()
+    cols = ["chunk_id", "doc_id", "chunk_index", "number", "chunk_text", "embeddings_bge-m3"]
+    df = load_chunks(cols, filters=[("doc_id", "in", doc_ids)]).sort_values(["doc_id", "chunk_index"])
     df["embedding"] = df["embeddings_bge-m3"].map(json.loads)
     return df.drop(columns="embeddings_bge-m3").rename(columns={"number": "num"}).reset_index(drop=True)
 
 
 def main() -> None:
-    chunks = load_chunks(CHUNK_COLUMNS + ["chunk_id"]).drop(columns="chunk_id")
+    chunks = load_chunks(CHUNK_COLUMNS)
     articles = chunks.drop_duplicates("doc_id")
     selected = select_articles(articles, load_rules())
     corpus_ids = set(selected.doc_id)

@@ -58,3 +58,9 @@ def test_parse_hierarchy_keeps_last_duplicate_level():
     assert parse_hierarchy(subtitles) == (
         "Partie législative > Sixième partie : La formation > Livre III : B > Titre II : T > Chapitre V : C"
     )
+
+
+def test_multi_chunk_articles_joined_with_newline(articles):
+    text = articles.loc[articles.num == "L6231-2", "text"].iloc[0]
+    assert ";\n14°" in text
+

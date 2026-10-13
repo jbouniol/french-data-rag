@@ -2,6 +2,10 @@
 
 Usage: uv run python -m src.ingest.stats
 """
+import os
+
+os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
+
 import pandas as pd
 from huggingface_hub import hf_hub_download
 from tokenizers import Tokenizer
