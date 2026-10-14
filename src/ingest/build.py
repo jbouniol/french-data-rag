@@ -18,8 +18,8 @@ CHUNK_COLUMNS = [
     "start_date", "end_date", "nota", "text",
 ]
 ARTICLE_COLUMNS = [
-    "doc_id", "num", "text", "hierarchy", "etat", "date_debut", "date_fin",
-    "url", "nota", "is_in_corpus",
+    "doc_id", "num", "text", "chunk_text", "hierarchy", "etat",
+    "date_debut", "date_fin", "url", "nota", "is_in_corpus",
 ]
 LEVEL_RE = re.compile(r"^(Livre|Titre|Chapitre)\b")
 PARTIE_RE = re.compile(r"^\w+ partie\b")
@@ -44,6 +44,14 @@ def parse_hierarchy(subtitles: str) -> str:
     return " > ".join(levels[k] for k in order if k in levels)
 
 
+def format_chunk(num: str, hierarchy: str, text: str, nota: str) -> str:
+    """Build the contextualized text for retrieval (article number, clean hierarchy, body, and optional nota)."""
+    parts = [f"Code du travail - Article {num}", hierarchy, text]
+    if nota:
+        parts.append(f"Nota : {nota}")
+    return "\n".join(p for p in parts if p)
+
+
 def build_articles(chunks: pd.DataFrame) -> pd.DataFrame:
     """One row per doc_id: text rebuilt by concatenating the chunks in order."""
     chunks = chunks.sort_values(["doc_id", "chunk_index"])
@@ -55,6 +63,10 @@ def build_articles(chunks: pd.DataFrame) -> pd.DataFrame:
     arts["date_debut"] = arts.start_date.map(date.fromisoformat)
     arts["date_fin"] = arts.end_date.map(date.fromisoformat)
     arts["nota"] = arts.nota.fillna("")
+    arts["chunk_text"] = [
+        format_chunk(n, h, t, no)
+        for n, h, t, no in zip(arts.num, arts.hierarchy, arts.text, arts.nota)
+    ]
     arts["url"] = "https://www.legifrance.gouv.fr/codes/article_lc/" + arts.doc_id
     return arts.reset_index(drop=True)
 
