@@ -8,6 +8,8 @@ dependencies = [
     "pandas>=2.2",
     "pyarrow>=17",
     "pyyaml>=6",
+    "rank-bm25>=0.2.2",
+    "sentence-transformers>=5.7.0",
     "tokenizers>=0.20",
 ]
 
