@@ -64,3 +64,13 @@ def test_multi_chunk_articles_joined_with_newline(articles):
     text = articles.loc[articles.num == "L6231-2", "text"].iloc[0]
     assert ";\n14°" in text
 
+
+def test_chunk_text_contextualized(articles):
+    assert (articles.chunk_text.str.startswith("Code du travail - Article ")).all()
+    for _, r in articles.iterrows():
+        assert r.hierarchy in r.chunk_text
+        assert r.text in r.chunk_text
+        if r.nota:
+            assert f"Nota : {r.nota}" in r.chunk_text
+
+

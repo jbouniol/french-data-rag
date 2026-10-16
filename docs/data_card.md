@@ -16,7 +16,7 @@ About 500 articles of the Code du travail in force, centred on **apprenticeship*
 | `data/processed/article_versions.parquet` | 1,066 versions (including the 540 in force) of the same articles: `MODIFIE`, `ABROGE`, `TRANSFERE`. Outside the corpus, to answer "at a given date" |
 | `data/processed/dinum_baseline_chunks.parquet` | 542 DINUM chunks + BGE-M3 embeddings of the 540 articles. Comparison baseline only |
 
-Columns of `articles.parquet` and `article_versions.parquet`: `doc_id` (LEGIARTI…), `num` (e.g. `L6222-1`), `text`, `hierarchy`, `etat`, `date_debut`, `date_fin`, `url`, `nota`, `is_in_corpus`.
+Columns of `articles.parquet` and `article_versions.parquet`: `doc_id` (LEGIARTI…), `num` (e.g. `L6222-1`), `text`, `chunk_text`, `hierarchy`, `etat`, `date_debut`, `date_fin`, `url`, `nota`, `is_in_corpus`.
 
 ## Selection rules
 Defined in [`src/ingest/selection.yaml`](../src/ingest/selection.yaml). Only `etat == VIGUEUR` articles are kept (`VIGUEUR_DIFF`, in force at a future date, are excluded). A rule adds the articles not already taken by the previous rules.
@@ -61,13 +61,17 @@ Breakdown per book:
 | 4 réglementaire | I: Dispositions générales | 4 | 71 |
 | 7 législative | III: Voyageurs, représentants, placiers… | 1 | 25 |
 
-## Cleaning and transformations
-- **Article text**: the DINUM chunks are glued back by `chunk_index` (concatenation of the `text` column, without the header added in `chunk_text`). 98.5% of articles have a single chunk.
+## Cleaning, chunking and transformations
+- **Article text (`text`)**: the DINUM chunks are glued back by `chunk_index` with `\n` (concatenation of the `text` column, without the header added in `chunk_text`). 99.6% of corpus articles (538/540) have a single chunk, and the longest is 1,006 BGE-M3 tokens (well within the 8,192-token window).
+- **Contextual article chunking (`chunk_text`)**: 1 article = 1 retrieval unit, formatted as `Code du travail - Article {num}\n{hierarchy}\n{text}` (plus `\nNota : {nota}` when present). Compared to the DINUM baseline (`dinum_baseline_chunks.parquet`), this fixes three issues:
+  1. **Missing hierarchy in DINUM**: 133 of the 542 DINUM chunks (24.5%, e.g. `L1231-2`) have no hierarchy in `chunk_text`, losing the subject when the text refers to *"du présent titre"* or *"du présent chapitre"*.
+  2. **Broken lists & dropped headers on multi-chunk articles**: on `L6231-2`, DINUM splits the list of CFA missions before `14°` and drops the hierarchy header on the second chunk.
+  3. **Omitted `nota`**: 97 articles have an application `nota` ignored by DINUM's `chunk_text`.
 - **`hierarchy`**: obtained by splitting `subtitles` on ` - ` and normalising whitespace. We keep code (législative/réglementaire), partie, livre, titre, chapitre. Sections and sub-sections are dropped. If a level appears twice (renamed), the last label is kept.
 - **`url`**: `https://www.legifrance.gouv.fr/codes/article_lc/{doc_id}`.
 - **Dates**: `date_debut` / `date_fin` as dates. The version in force has `date_fin = 2999-01-01`.
 - **`MODIFIE_MORT_NE` versions** (14 for the selected articles) removed from `article_versions.parquet`: modified before coming into force, `date_fin` earlier than `date_debut`, never applicable.
-- **DINUM embeddings**: decoded (JSON → list of floats). They only serve as a baseline; the final index uses our own chunking and embedding choices.
+- **DINUM embeddings**: decoded (JSON → list of floats). They only serve as a baseline; the final index uses our own chunking (`chunk_text`) and embedding choices.
 
 ## Known limits
 - **SMIC amount missing**: it is set by a decree outside the Code du travail (only the calculation method is in it). The system must answer that it cannot quote the amount.
