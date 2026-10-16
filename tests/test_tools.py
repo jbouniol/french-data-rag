@@ -36,6 +36,7 @@ def test_amount_uses_dated_smic():
     r = compute_remuneration(18, 1, on_date=date(2026, 3, 1))
     assert f"{1823.03 * 0.43:.2f}" in r["content"]
     assert r["citable"]["D6222-26"] == "LEGIARTI000038033238"
+    assert r["retrieved"] == ["LEGIARTI000038033238"]
 
 
 def test_before_grid_redirects_to_dated_article():
@@ -72,6 +73,8 @@ def test_unknown_article():
 
 def test_normalize_num():
     assert normalize_num("article l. 6222-7-1") == "L6222-7-1"
+    assert normalize_num("Art. L. 6222-7-1 du Code du travail") == "L6222-7-1"
+    assert normalize_num("[D6222-26]") == "D6222-26"
 
 
 # ============ run_tool: validation before execution ============

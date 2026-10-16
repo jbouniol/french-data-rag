@@ -2,11 +2,12 @@
 and returns a dict: what the model reads + the article versions it may cite (num -> doc_id)."""
 import datetime as dt
 from functools import lru_cache
+import re
 
 import pandas as pd
 from pydantic import BaseModel, Field
 
-from src.retrieval.search import search
+from src.retrieval.search import NUMBER_RAW, search
 
 VERSIONS_PATH = "data/processed/article_versions.parquet"
 
@@ -49,8 +50,11 @@ def in_force_id(num: str) -> str:
 
 
 def normalize_num(num: str) -> str:
-    """'l. 6222-7-1' / 'article L6222-7-1' -> 'L6222-7-1'."""
-    return num.upper().replace("ARTICLE", "").replace(".", "").replace(" ", "")
+    """'l. 6222-7-1' / 'Art. L. 6222-7-1' / '[L6222-7-1]' -> 'L6222-7-1'."""
+    m = re.search(NUMBER_RAW, num, re.IGNORECASE)
+    if m:
+        return f"{m.group(1).upper()}{m.group(2)}"
+    return num.upper().replace("ARTICLE", "").replace(".", "").replace(" ", "").strip("[]")
 
 
 def get_article_at_date(num: str, date: dt.date) -> dict:
@@ -126,9 +130,10 @@ def compute_remuneration(age: int, contract_year: int, licence_pro: bool = False
                      f"(external parameter, not in the Code du travail). "
                      f"Minimum: {percent} % x {smic_amount:.2f} = {smic_amount * percent / 100:.2f} EUR gross per month.")
     lines += [f"Note: {n}." for n in notes]
+    citable = {num: in_force_id(num) for num in applied}
     return {"content": "\n".join(lines),
-            "citable": {num: in_force_id(num) for num in applied},
-            "retrieved": [],
+            "citable": citable,
+            "retrieved": list(citable.values()),
             "percent_smic": percent}
 
 
