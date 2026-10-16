@@ -3,16 +3,19 @@
 Every stage returns a ranking: a list of (row_index, score), best first.
 """
 from dataclasses import dataclass, field
-from sentence_transformers import SentenceTransformer, CrossEncoder
+from functools import lru_cache
 import hashlib
+import os
+from pathlib import Path
 import re
 import unicodedata
-from functools import lru_cache
-from pathlib import Path
+
+os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
 
 import numpy as np
 import pandas as pd
 from rank_bm25 import BM25Okapi
+from sentence_transformers import CrossEncoder, SentenceTransformer
 
 ARTICLES_PATH = "data/processed/articles.parquet"
 BASELINE_PATH = "data/processed/dinum_baseline_chunks.parquet"
@@ -21,9 +24,11 @@ EMBED_MODEL = "BAAI/bge-m3"
 RERANK_MODEL = "BAAI/bge-reranker-v2-m3"
 POOL = 30                # candidates kept per stage before fusion / reranking
 RRF_K = 60               # standard RRF constant
-EXACT_NUMBER_FIRST = True  # set False for the "pure retrieval" ablation
 
-NUMBER = r"[lrd]\d{4}-\d+(?:-\d+)?"   # L6222-35, D6222-26, R6227-7
+NUM_BODY = r"\d{4}-\d+(?:-\d+)?"
+NUMBER = rf"[lrd]{NUM_BODY}"                  # l6222-35, d6222-26, r6227-7
+NUMBER_RAW = rf"\b([lrd])\.?\s*({NUM_BODY})"  # L. 6222-35, L 6222-35, L6222-35
+
 
 @dataclass
 class Hit:
@@ -38,9 +43,7 @@ class Hit:
 @lru_cache(maxsize=1)
 def load_articles():
     df = pd.read_parquet(ARTICLES_PATH).reset_index(drop=True)
-    # the article body does not contain its own number, so we add it
-    texts = ("Article " + df["num"] + "\n" + df["text"]).tolist()
-    return df, texts
+    return df, df["chunk_text"].tolist()
 
 
 def make_mask(df, filters):
@@ -64,7 +67,7 @@ def clean(text):
     """lowercase, remove accents, write 'L. 6222-35' as 'l6222-35'."""
     text = unicodedata.normalize("NFKD", text.lower())
     text = "".join(c for c in text if not unicodedata.combining(c))
-    return re.sub(r"\b([lrd])\.?\s?(\d{4}-\d+(?:-\d+)?)", r"\1\2", text)
+    return re.sub(NUMBER_RAW, r"\1\2", text)
 
 
 def tokenize(text):
@@ -150,6 +153,8 @@ def get_reranker():
 
 
 def rerank(query, ranking):
+    if not ranking:
+        return []
     _, texts = load_articles()
     scores = get_reranker().predict([(query, texts[i]) for i, _ in ranking])
     return sorted(((i, float(s)) for (i, _), s in zip(ranking, scores)), key=lambda x: -x[1])
@@ -167,7 +172,13 @@ def exact_number_first(query, df, mask, ranking):
 
 
 # ============ 7. the public function ============
-def search(query: str, k: int = 10, filters: dict | None = None, mode: str = "hybrid_rerank") -> list[Hit]:
+def search(
+    query: str,
+    k: int = 10,
+    filters: dict | None = None,
+    mode: str = "hybrid_rerank",
+    exact_match: bool = True,
+) -> list[Hit]:
     """mode: bm25 | dense | baseline | hybrid | hybrid_rerank"""
     df, _ = load_articles()
     mask = make_mask(df, filters)
@@ -185,7 +196,7 @@ def search(query: str, k: int = 10, filters: dict | None = None, mode: str = "hy
     else:
         raise ValueError(f"unknown mode: {mode}")
 
-    if EXACT_NUMBER_FIRST:
+    if exact_match:
         ranking = exact_number_first(query, df, mask, ranking)
 
     hits = []
@@ -196,8 +207,15 @@ def search(query: str, k: int = 10, filters: dict | None = None, mode: str = "hy
             chunk_id=row["doc_id"],   # 1 article = 1 chunk
             score=score,
             text=row["text"],
-            metadata={"num": row["num"], "hierarchy": row["hierarchy"],
-                      "etat": row["etat"], "url": row["url"]},
+            metadata={
+                "num": row["num"],
+                "hierarchy": row["hierarchy"],
+                "etat": row["etat"],
+                "date_debut": str(row["date_debut"]),
+                "date_fin": str(row["date_fin"]),
+                "url": row["url"],
+                "nota": row["nota"],
+            },
         ))
     return hits
 
