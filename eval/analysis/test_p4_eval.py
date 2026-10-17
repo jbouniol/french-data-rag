@@ -68,6 +68,25 @@ def test_native_parquet_and_answer_trace_need_no_conversion(files):
     assert corpus["v2"]["date_debut"] == date(2010, 1, 1)
 
 
+def test_four_field_golden_needs_no_annotation(tmp_path):
+    path = tmp_path / "golden.jsonl"
+    original = question()
+    E.write_jsonl(path, [original])
+    assert E.load_questions(path) == {"q1": original}
+
+
+@pytest.mark.parametrize("annotation", [
+    {"category": "unknown"}, {"category": "historical", "as_of": "not-a-date"},
+    {"category": "historical", "as_of": "2025-02-30"},
+    {"category": "factual", "unexpected": True}, {"as_of": "2025-01-01"},
+])
+def test_invalid_nested_annotations_are_rejected(tmp_path, annotation):
+    path = tmp_path / "bad-metadata.jsonl"
+    E.write_jsonl(path, [question(annotation=annotation)])
+    with pytest.raises(ValueError):
+        E.load_questions(path)
+
+
 @pytest.mark.parametrize("changes", [
     {"status": "draft"}, {"status": "draft_needs_sources"}, {"answer": None},
     {"question": "Date [DATE_DE_REFERENCE] ?"},
@@ -179,16 +198,21 @@ def test_operational_failure_is_not_successful_abstention(files, stop_reason, fa
 
 
 def test_calculation_reference_is_not_a_parser_for_the_model_answer(files, tmp_path):
-    path = tmp_path / "annotations.jsonl"
-    E.write_jsonl(path, [{"id": "q1", "category": "calculation",
-                          "expected_calculation": {"value": "954.95", "unit": "EUR", "tolerance": "0.01"}}])
-    annotations = E.load_annotations(path, {"q1": question()})
-    row = E.checks(question(), result(answer="Montant 1 000,00 €, après comparaison avec 954,95 €."),
-                   E.load_corpus(files[2]), annotations["q1"])
+    path = tmp_path / "annotated-golden.jsonl"
+    E.write_jsonl(path, [question(annotation={"category": "calculation", "as_of": "2025-01-01",
+                    "expected_calculation": {"value": "954.95", "unit": "EUR", "tolerance": "0.01"},
+                    "notes": "SMIC et taux vérifiés indépendamment.", "evidence": {"v1": "Texte fictif v1."}})])
+    q = E.load_questions(path)["q1"]
+    annotation = q["annotation"]
+    row = E.checks(q, result(answer="Montant 1 000,00 €, après comparaison avec 954,95 €."),
+                   E.load_corpus(files[2]), annotation)
     # A number appearing anywhere in a free answer does not establish a correct calculation.
     assert row.get("calculation_correct") is None
-    assert annotations["q1"]["expected_calculation"]["value"] == "954.95"
-    payload = E.judge_payload(question(), result(), E.load_corpus(files[2]), annotations["q1"])
+    assert annotation["expected_calculation"]["value"] == "954.95"
+    assert annotation["expected_calculation"]["tolerance"] == "0.01"
+    assert annotation["as_of"] == "2025-01-01"
+    assert annotation["evidence"]["v1"] == "Texte fictif v1."
+    payload = E.judge_payload(q, result(), E.load_corpus(files[2]), annotation)
     assert payload["annotation"]["expected_calculation"]["value"] == "954.95"
     assert payload["evidence"][0]["text"] == "Texte fictif v1."
 
@@ -224,7 +248,10 @@ def test_jsonl_writer_preserves_existing_results(tmp_path):
 
 
 def test_cli_workflow_uses_native_traces_and_refuses_overwrite(files, tmp_path, monkeypatch):
-    questions_path, results_path, corpus_path = files
+    _, results_path, corpus_path = files
+    questions_path = tmp_path / "annotated-golden.jsonl"
+    E.write_jsonl(questions_path, [question(annotation={"category": "calculation", "as_of": "2025-01-01",
+                    "expected_calculation": {"value": "954.95", "unit": "EUR"}})])
     common = ["--questions", str(questions_path), "--corpus", str(corpus_path),
               "--results", str(results_path)]
     assert E.main(["validate", *common, "--expected-count", "1"]) == 0
@@ -242,6 +269,9 @@ def test_cli_workflow_uses_native_traces_and_refuses_overwrite(files, tmp_path, 
     judgments_path = tmp_path / "judgments.jsonl"
     judge_args = ["judge", *common, "--model", "synthetic-judge", "--out", str(judgments_path)]
     assert E.main(judge_args) == 0
+    assert calls[0][0]["annotation"]["category"] == "calculation"
+    assert calls[0][0]["annotation"]["as_of"] == "2025-01-01"
+    assert calls[0][0]["annotation"]["expected_calculation"]["value"] == "954.95"
     assert calls[0][1] == "synthetic-judge"
     assert calls[0][2] == 180
     assert json.loads(judgments_path.read_text().strip())["status"] == "ok"
@@ -254,7 +284,11 @@ def test_cli_workflow_uses_native_traces_and_refuses_overwrite(files, tmp_path, 
     report_args = ["report", *common, "--judgments", str(judgments_path), "--out", str(out)]
     assert E.main(report_args) == 0
     assert (out / "report.md").is_file()
-    assert len((out / "checks.jsonl").read_text().splitlines()) == 1
+    checks = E.read_jsonl(out / "checks.jsonl")
+    assert len(checks) == 1
+    assert checks["q1"]["category"] == "calculation"
+    assert checks["q1"]["date_valid"] is True
+    assert "| calculation | 1 |" in (out / "report.md").read_text()
     original = (out / "report.md").read_bytes()
     assert E.main(report_args) != 0
     assert (out / "report.md").read_bytes() == original
@@ -298,9 +332,9 @@ def test_judge_cli_records_errors_without_fabricating_scores(files, tmp_path, mo
 ])
 def test_calculation_references_must_be_finite_with_nonnegative_tolerance(tmp_path, reference):
     path = tmp_path / "bad-reference.jsonl"
-    E.write_jsonl(path, [{"id": "q1", "category": "calculation", "expected_calculation": reference}])
+    E.write_jsonl(path, [question(annotation={"category": "calculation", "expected_calculation": reference})])
     with pytest.raises(ValueError):
-        E.load_annotations(path, {"q1": question()})
+        E.load_questions(path)
 
 
 def test_judge_uses_real_ollama_sdk_with_native_schema_and_dates(files, monkeypatch):
