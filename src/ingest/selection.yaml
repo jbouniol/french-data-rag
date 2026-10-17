@@ -1,0 +1,40 @@
+# Corpus selection rules. Only VIGUEUR (in force) articles are considered.
+# Each rule = a name, a description and at least one criterion:
+#   number_regex: regex on the article number (e.g. L6222-35)
+#   subtitles_regex: regex on the hierarchy (whitespace normalised)
+#   exclude_subtitles_regex: drops articles whose hierarchy matches
+# If both number_regex and subtitles_regex are given, both must match.
+# An article already taken by a previous rule is not counted again.
+rules:
+  - name: apprenticeship
+    description: Partie 6 livre II, apprenticeship (législatif, réglementaire, décrets)
+    number_regex: '^[LRD]62\d\d-'
+
+  - name: professionalization_contract
+    description: Partie 6 livre III titre II chapitre V (contrats de professionnalisation)
+    number_regex: '^[LRD]6325-'
+
+  - name: young_workers
+    description: Working time, rest and work of young workers (jeunes travailleurs)
+    subtitles_regex: 'jeunes travailleurs'
+
+  - name: paid_leave
+    description: Paid leave (congés payés), without the leave funds (caisses de congés, construction sector only)
+    number_regex: '^[LRD]3141-'
+    exclude_subtitles_regex: 'Caisses de congés'
+
+  - name: trial_period
+    description: Trial period (période d'essai)
+    subtitles_regex: "Période d'essai"
+
+  - name: cdi_termination
+    description: Resignation and dismissal for personal reasons (L/R/D 1231 and 1232)
+    number_regex: '^[LRD]123[12]-'
+
+  - name: cdd_termination
+    description: Termination of a fixed-term contract (CDD, L/R/D 1243)
+    number_regex: '^[LRD]1243-'
+
+  - name: mutual_termination
+    description: Individual mutual termination (rupture conventionnelle, L1237-11 to L1237-19)
+    number_regex: '^[LRD]1237-1[1-9]'
