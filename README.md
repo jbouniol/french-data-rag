@@ -32,9 +32,38 @@ uv run python -m src.ingest.build
 
 ## Evaluation
 
+`eval/golden.jsonl` contains one JSON object per line using the assignment schema:
+
+```json
+{"id":"q017","question":"Quel est le délai pour contester une amende forfaitaire ?","answer":"45 jours","gold_docs":["F1234"]}
+```
+
+`F1234` above is only the assignment's placeholder: replace it with a real corpus document ID.
+`gold_docs` contains the IDs of documents that support the answer. Use `[]` when the corpus
+does not contain the answer. The `golden.jsonl` file is currently empty; add about 40 varied
+questions (answerable, unanswerable, and prompt-injection attempts) before running the command.
+
 ```bash
 uv run python eval/run_eval.py --questions eval/golden.jsonl --out eval/
 ```
+
+This writes `eval/results.jsonl`, one row per question and backend, with the generated answer,
+cited sources, retrieved document IDs, token counts, latency, tool calls, stop reason, and
+answer F1 / document recall. `summary.csv` and `comparison.md` report aggregate quality,
+latency, tokens, and cost. Run the local agent loop instead with `--local-mode agent`.
+
+For API comparison, implement a Python callable taking `question: str` and returning a dict
+with the same fields as `AnswerTrace` (`answer`, `citations`, `retrieved_ids`, `tokens_in`,
+`tokens_out`, `latency_ms`, `tool_calls`, `cost_eur`, `stop_reason`). Then run:
+
+```bash
+uv run python eval/run_eval.py --questions eval/golden.jsonl --out eval/ \
+  --backend both --local-mode rag --api-adapter my_api_adapter:answer
+```
+
+The adapter is intentionally provider-specific; the repository does not currently include an
+API backend. Set `cost_eur` to `None` when pricing is unavailable so the report shows `N/A`.
+The local cost is the model's direct usage cost (zero); electricity and hardware are not included.
 
 ## Tests
 
