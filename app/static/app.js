@@ -395,7 +395,11 @@ function resetToHome() {
     clearInterval(state.timerInterval);
     state.timerInterval = null;
   }
-  document.getElementById('home-stage').classList.remove('hidden');
+  const homeStage = document.getElementById('home-stage');
+  if (homeStage) {
+    homeStage.classList.remove('is-launching', 'hidden');
+  }
+  document.body.classList.remove('is-launching');
   document.getElementById('chat-view').classList.add('hidden');
   closeSourcePanel();
   const homeInput = document.getElementById('home-input');
@@ -616,9 +620,22 @@ async function submitFromChat() {
 
 async function executeQuery(payload) {
   const qText = payload.question || '';
-  document.getElementById('home-stage').classList.add('hidden');
-  document.getElementById('chat-view').classList.remove('hidden');
+  const homeStage = document.getElementById('home-stage');
+  const chatView = document.getElementById('chat-view');
   closeSourcePanel();
+
+  // Trigger the home title & blue aura launch animation if starting from the home screen
+  if (homeStage && !homeStage.classList.contains('hidden')) {
+    homeStage.classList.add('is-launching');
+    document.body.classList.add('is-launching');
+    setTimeout(() => {
+      document.body.classList.remove('is-launching');
+    }, 1150);
+    await new Promise((resolve) => setTimeout(resolve, 680));
+    homeStage.classList.add('hidden');
+    homeStage.classList.remove('is-launching');
+  }
+  if (chatView) chatView.classList.remove('hidden');
 
   document.getElementById('user-question-text').textContent = qText;
   const drawer = document.getElementById('trace-accordion');
