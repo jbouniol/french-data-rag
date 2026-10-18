@@ -5,13 +5,13 @@ Quatre fichiers suffisent :
 | Fichier | Utilité |
 |---|---|
 | `p4_eval.py` | Valider les données, appeler le juge Ollama et produire le rapport. La consigne du juge est dans `SYSTEM`. |
-| `questions_draft.jsonl` | Les 40 questions candidates, avec catégorie, date et comportement attendu dans `annotation`. |
+| `questions_draft.jsonl` | Les 40 questions de référence (`eval/golden.jsonl`), avec catégorie, date et comportement attendu dans `annotation`. |
 | `test_p4_eval.py` | Vérifier les formats, métriques, dates et erreurs sur des données synthétiques. |
 | `README.md` | Formats, commandes et méthode. |
 
 ## Préparer les références
 
-Les questions restent un brouillon : réponses nulles, sources non vérifiées et marqueur `draft_needs_sources`. Lire les articles, remplacer les placeholders et renseigner les réponses et vrais identifiants de versions avant de créer `eval/golden.jsonl`. Retirer le champ `status` seulement après vérification humaine.
+Les 40 questions ont été vérifiées contre `data/processed/article_versions.parquet` et figées dans `eval/golden.jsonl` (ainsi que dans `eval/analysis/questions_draft.jsonl`).
 
 Le golden accepte les quatre champs du PDF. `annotation` est facultatif et regroupe les informations d’évaluation dans la même ligne :
 
@@ -27,7 +27,7 @@ Figer les 40 références pour le test final et utiliser d’autres questions po
 
 Le script lit directement `data/processed/article_versions.parquet` : identifiants `doc_id` des versions LEGIARTI, `text`, `num`, `etat`, `date_debut`, `date_fin`. Les intervalles sont début inclus, fin exclue ; 2999 représente une fin ouverte.
 
-Le runner de Brian doit ajouter `id` et idéalement `mode` à `asdict(answer(question, mode=mode))`. Les champs natifs sont `answer`, `citations`, `retrieved_ids`, `tokens_in`, `tokens_out`, `latency_ms`, `tool_calls`, `stop_reason`, `cost_eur`. Le runner `eval/run_eval.py` reste à implémenter par P2.
+Le runner `eval/run_eval.py` ajoute `id` et `mode` à `asdict(answer(question, mode=mode))`. Les champs natifs sont `answer`, `citations`, `retrieved_ids`, `tokens_in`, `tokens_out`, `latency_ms`, `tool_calls`, `stop_reason`, `cost_eur`.
 
 Depuis la racine, après installation des dépendances du projet, avec les fichiers réels :
 
