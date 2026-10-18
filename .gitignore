@@ -8,3 +8,5 @@ __pycache__/
 .mypy_cache/
 .DS_Store
 qdrant_storage/
+docs/slides*/
+*.pptx
