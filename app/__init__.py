@@ -1,1 +1,1 @@
-"""Alter-Ego Web Demo package (Workstream E)."""
+"""Alter-Ego Web Demo package."""

@@ -1,4 +1,4 @@
-# Data log (workstream A)
+# Data log
 
 Format: **we observe** → **we do**. One line per observation, numbered by step (1.x, 2.x…). Updated as we go.
 

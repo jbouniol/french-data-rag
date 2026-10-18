@@ -1,4 +1,4 @@
-"""OpenRouter Cloud API bridge for Workstream E (Local Ollama vs Cloud API comparison).
+"""Cloud API bridge for Local (Ollama) vs Cloud API comparison.
 
 Dynamically loads `OPENROUTER_API_KEY` from `.env` (hot-reload on every request, no server
 restart needed) and bridges `src.agent.llm.chat` to `https://openrouter.ai/api/v1/chat/completions`
@@ -24,7 +24,7 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 ENV_PATH = ROOT_DIR / ".env"
 USD_TO_EUR = 0.92
 
-# Curated Cloud API models (OpenRouter & Anthropic Direct) for Workstream E
+# Curated Cloud API models (OpenRouter & Anthropic Direct)
 API_MODEL_CATALOG: dict[str, dict[str, Any]] = {
     # OpenRouter API models (OPENROUTER_API_KEY)
     "google/gemini-2.5-flash": {

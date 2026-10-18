@@ -27,7 +27,7 @@ uv sync
 cp .env.example .env
 ```
 
-## Web Demo UI (workstream E)
+## Web Demo UI
 
 Launch the interactive web application (answer + Legifrance sources + live agent trace + deterministic tool sandbox + Local vs API model switcher):
 
@@ -35,7 +35,7 @@ Launch the interactive web application (answer + Legifrance sources + live agent
 uv run python -m app --open
 ```
 
-## Data (workstream A)
+## Data
 
 Source: [`AgentPublic/legi`](https://huggingface.co/datasets/AgentPublic/legi) (Etalab 2.0), Code du travail only (262 MB). Details in [docs/data_card.md](docs/data_card.md).
 
