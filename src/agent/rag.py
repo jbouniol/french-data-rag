@@ -1,3 +1,6 @@
+from dotenv import load_dotenv
+load_dotenv()
+
 """Simple RAG pipeline (a workflow, not an agent): search -> Gemma -> validated answer.
 
 Defences against prompt injection, in layers (course session 4):
@@ -60,7 +63,7 @@ def format_source(n: int, hit: Hit) -> str:
 
 def build_prompt(question: str, hits: list[Hit]) -> str:
     sources = "\n\n".join(format_source(n, h) for n, h in enumerate(hits, start=1))
-    question = question.replace("</question", "&lt;/question")
+    question = re.sub(r"</?(?:question|source)", lambda m: m.group(0).replace("<", "&lt;"), question, flags=re.I)
     return f"Sources:\n{sources}\n\n<question>\n{question}\n</question>"
 
 
@@ -126,7 +129,6 @@ def run(question: str, k: int = K) -> dict:
             answer, citations = render(result, hits)
             stop_reason = result.status
             break
-        answer = message.content            # kept for error analysis if the retry fails too
         messages += [{"role": "assistant", "content": message.content},
                      {"role": "user", "content": "Your answer breaks these rules:\n- " + "\n- ".join(problems)
                       + "\nAnswer again in the same JSON format."}]

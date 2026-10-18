@@ -25,9 +25,9 @@ RERANK_MODEL = "BAAI/bge-reranker-v2-m3"
 POOL = 30                # candidates kept per stage before fusion / reranking
 RRF_K = 60               # standard RRF constant
 
-NUM_BODY = r"\d{4}-\d+(?:-\d+)?"
+NUM_BODY = r"\d{4}(?:-\d+)?"
 NUMBER = rf"[lrd]{NUM_BODY}"                  # l6222-35, d6222-26, r6227-7
-NUMBER_RAW = rf"\b([lrd])\.?\s*({NUM_BODY})"  # L. 6222-35, L 6222-35, L6222-35
+NUMBER_RAW = rf"\b([lrd])(?!')\s*[-.]?\s*({NUM_BODY})"  # L. 6222-35, L 6222-35, L6222-35
 
 
 @dataclass

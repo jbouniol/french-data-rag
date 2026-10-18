@@ -1,3 +1,6 @@
+from dotenv import load_dotenv
+load_dotenv()
+
 """Tool-using agent: native Ollama tool calls in a loop, until final_answer (course session 6).
 
 Termination: final_answer (answered | not_found | out_of_scope), max_iterations, budget_exceeded,
@@ -69,7 +72,7 @@ def check_final(result: FinalAnswer, citable: dict) -> list[str]:
 
 def run(question: str, max_iterations: int = MAX_ITERATIONS, token_budget: int = TOKEN_BUDGET) -> dict:
     start = time.perf_counter()
-    question = question.replace("</question", "&lt;/question")
+    question = re.sub(r"</?(?:question|source)", lambda m: m.group(0).replace("<", "&lt;"), question, flags=re.I)
     messages = [{"role": "system", "content": SYSTEM},
                 {"role": "user", "content": f"<question>\n{question}\n</question>"}]
     citable, retrieved, tool_calls, seen = {}, [], [], {}
@@ -96,7 +99,7 @@ def run(question: str, max_iterations: int = MAX_ITERATIONS, token_budget: int =
         if final.status != "answered":
             return result(final.status, final.answer.strip()), None
         used = [normalize_num(m) for m in MARKER.findall(final.answer)] + [normalize_num(c) for c in final.citations]
-        return result("answered", final.answer.strip(), dict.fromkeys(citable[n] for n in used if n in citable)), None
+        return result("answered", final.answer.strip(), dict.fromkeys(doc_id for n in used if n in citable for doc_id in citable[n])), None
 
     for step in range(1, max_iterations + 1):
         try:
@@ -160,7 +163,8 @@ def run(question: str, max_iterations: int = MAX_ITERATIONS, token_budget: int =
                     out = run_tool(name, args)
                     record["latency_ms"] = round((time.perf_counter() - t) * 1000, 1)
                     record["error"] = bool(out.get("error"))
-                    citable.update(out.get("citable", {}))
+                    for k, v in out.get("citable", {}).items():
+                        citable.setdefault(k, []).append(v)
                     retrieved.extend(out.get("retrieved", []))
                     observation = out["content"]
 

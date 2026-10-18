@@ -64,7 +64,7 @@ def get_article_at_date(num: str, date: dt.date) -> dict:
     if rows.empty:
         return {"content": f"Article {num} is not in the corpus.", "citable": {}, "retrieved": []}
     # date_fin is exclusive: the next version starts on that day
-    match = rows[(rows.date_debut <= date) & (date < rows.date_fin) & (rows.etat != "ABROGE")]
+    match = rows[(rows.date_debut <= date) & (date < rows.date_fin)]
     if match.empty:
         spans = ", ".join(f"{r.date_debut} to {r.date_fin} ({r.etat})" for r in rows.itertuples())
         return {"content": f"No version of article {num} was in force on {date}. Known versions: {spans}.",
@@ -109,14 +109,16 @@ def compute_remuneration(age: int, contract_year: int, licence_pro: bool = False
         notes.append("under 16: same pay as 16-17 year olds (D6222-27)")
     band = "16-17 ans" if age <= 17 else "18-20 ans" if age <= 20 else "21-25 ans" if age <= 25 else "26 ans et plus"
     year = contract_year
-    if year > 3:
-        applied.append("D6222-28")
-        notes.append(f"contract year {year}: an extended apprenticeship keeps the rate of the last year (D6222-28)")
-        year = 3
     if licence_pro:
         applied.append("D6222-32")
         notes.append("licence professionnelle: rate of the 2nd year of the contract (D6222-32)")
         year = 2
+    elif year > 3:
+        applied.append("D6222-28")
+        notes.append(f"contract year {year}: an extended apprenticeship keeps the rate of the last year (D6222-28)")
+        year = 3
+    if age >= 30:
+        notes.append("age >= 30: requires a derogation (L6222-1 / L6222-2) as the general limit is 29 years old.")
     percent = min(GRID[band][year - 1], 100)          # D6222-31: never above 100 % of the SMIC
     if band in ("21-25 ans", "26 ans et plus"):
         notes.append("or the conventional minimum wage of the job if it is higher (collective agreement: not covered)")

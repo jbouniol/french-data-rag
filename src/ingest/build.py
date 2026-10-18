@@ -21,7 +21,7 @@ ARTICLE_COLUMNS = [
     "doc_id", "num", "text", "chunk_text", "hierarchy", "etat",
     "date_debut", "date_fin", "url", "nota", "is_in_corpus",
 ]
-LEVEL_RE = re.compile(r"^(Livre|Titre|Chapitre)\b")
+LEVEL_RE = re.compile(r"^(Livre|Titre|Chapitre|Section|Sous-section)\b", re.IGNORECASE)
 PARTIE_RE = re.compile(r"^\w+ partie\b")
 
 
