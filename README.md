@@ -32,34 +32,32 @@ uv run python -m src.ingest.build
 
 ## Evaluation
 
-`eval/golden.jsonl` contains one JSON object per line. Add quality annotations to measure
-quality; without them, only the expected answer status is scored.
+`eval/golden.jsonl` contains one JSON object per line using the assignment schema:
 
 ```json
-{"id":"q001","question":"Quelle est la durée maximale d'un contrat d'apprentissage ?","expected_status":"answered","must_include":["trois ans"],"expected_citations":["LEGIARTI..."],"reference_answer":"La durée maximale est de trois ans."}
+{"id":"q017","question":"Quel est le délai pour contester une amende forfaitaire ?","answer":"45 jours","gold_docs":["F1234"]}
 ```
 
-Supported annotations: `expected_status` (`answered` by default), `must_include` (answer
-substrings, case-insensitive), `expected_citations` (expected `LEGIARTI...` IDs), and
-`reference_answer` (used for a lexical token F1, not semantic grading).
+`F1234` above is only the assignment's placeholder: replace it with a real corpus document ID.
+`gold_docs` contains the IDs of documents that support the answer. Use `[]` when the corpus
+does not contain the answer. The `golden.jsonl` file is currently empty; add about 40 varied
+questions (answerable, unanswerable, and prompt-injection attempts) before running the command.
 
 ```bash
-uv run python -m eval.run_eval --questions eval/golden.jsonl --out results/ --backend local --local-mode rag
+uv run python eval/run_eval.py --questions eval/golden.jsonl --out eval/
 ```
 
-Each run creates a timestamped directory containing predictions (`predictions.jsonl`),
-aggregates (`summary.csv`), and a comparison table (`comparison.md`). Run the agent instead
-with `--local-mode agent`. The table reports status accuracy, keyword/citation recall,
-optional answer token F1, latency percentiles, token counts, and cost. The quality score is the mean of the available keyword recall, citation recall, and
-lexical answer F1 for annotated questions. Status accuracy is reported separately.
-This score is a transparent deterministic proxy, not a semantic or human evaluation.
+This writes `eval/results.jsonl`, one row per question and backend, with the generated answer,
+cited sources, retrieved document IDs, token counts, latency, tool calls, stop reason, and
+answer F1 / document recall. `summary.csv` and `comparison.md` report aggregate quality,
+latency, tokens, and cost. Run the local agent loop instead with `--local-mode agent`.
 
 For API comparison, implement a Python callable taking `question: str` and returning a dict
 with the same fields as `AnswerTrace` (`answer`, `citations`, `retrieved_ids`, `tokens_in`,
-`tokens_out`, `latency_ms`, `cost_eur`, `stop_reason`). Then run:
+`tokens_out`, `latency_ms`, `tool_calls`, `cost_eur`, `stop_reason`). Then run:
 
 ```bash
-uv run python -m eval.run_eval --questions eval/golden.jsonl --out results/ \
+uv run python eval/run_eval.py --questions eval/golden.jsonl --out eval/ \
   --backend both --local-mode rag --api-adapter my_api_adapter:answer
 ```
 
