@@ -8,7 +8,10 @@ import math
 from pathlib import Path
 import re
 import statistics
+import sys
 from typing import Any, Callable
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 
 def load_questions(path: Path) -> list[dict[str, Any]]:
@@ -77,8 +80,8 @@ def token_f1(reference: str, prediction: str) -> float:
 
 def score(item: dict[str, Any], result: dict[str, Any]) -> dict[str, Any]:
     gold_docs = set(item["gold_docs"])
-    retrieved = set(result.get("retrieved_doc_ids") or [])
-    cited = set(result.get("cited_sources") or [])
+    retrieved = set(result.get("retrieved_ids") or result.get("retrieved_doc_ids") or [])
+    cited = set(result.get("citations") or result.get("cited_sources") or [])
     return {
         "answer_token_f1": token_f1(item["answer"], str(result.get("answer", ""))),
         "retrieved_doc_recall": len(gold_docs & retrieved) / len(gold_docs) if gold_docs else None,
@@ -218,30 +221,31 @@ def main() -> None:
                         raise TypeError("backend must return a dict or dataclass with AnswerTrace fields")
                     result = {
                         "answer": result.get("answer", ""),
-                        "cited_sources": result.get("citations", result.get("cited_sources", [])),
-                        "retrieved_doc_ids": result.get("retrieved_ids", result.get("retrieved_doc_ids", [])),
+                        "citations": result.get("citations", result.get("cited_sources", [])),
+                        "retrieved_ids": result.get("retrieved_ids", result.get("retrieved_doc_ids", [])),
                         "tokens_in": result.get("tokens_in", 0),
                         "tokens_out": result.get("tokens_out", 0),
-                        "latency_ms": result.get("latency_ms"),
-                        "cost_eur": result.get("cost_eur"),
+                        "latency_ms": result.get("latency_ms", 0.0),
+                        "cost_eur": result.get("cost_eur", 0.0),
                         "tool_calls": result.get("tool_calls", []),
                         "stop_reason": result.get("stop_reason", "error"),
                     }
                 except Exception as err:
                     result = {
                         "answer": "",
-                        "cited_sources": [],
-                        "retrieved_doc_ids": [],
+                        "citations": [],
+                        "retrieved_ids": [],
                         "tokens_in": 0,
                         "tokens_out": 0,
-                        "latency_ms": None,
-                        "cost_eur": None,
+                        "latency_ms": 0.0,
+                        "cost_eur": 0.0,
                         "tool_calls": [],
                         "stop_reason": "error",
                         "error": f"{type(err).__name__}: {err}",
                     }
                 rows.append({
                     "backend": backend,
+                    "mode": args.local_mode if backend.startswith("local-") else result.get("mode"),
                     "id": item["id"],
                     "question": question,
                     "gold_answer": item["answer"],

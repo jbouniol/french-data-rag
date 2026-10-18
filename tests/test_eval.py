@@ -60,8 +60,8 @@ def test_score_calculates_answer_f1_and_document_recall():
     item = {"answer": "Le contrat dure trois ans.", "gold_docs": ["DOC1", "DOC2"]}
     result = {
         "answer": "Le contrat dure trois ans.",
-        "cited_sources": ["DOC1"],
-        "retrieved_doc_ids": ["DOC1", "DOC3"],
+        "citations": ["DOC1"],
+        "retrieved_ids": ["DOC1", "DOC3"],
     }
 
     scored = score(item, result)
@@ -73,8 +73,8 @@ def test_score_calculates_answer_f1_and_document_recall():
 def test_score_leaves_document_recall_undefined_for_empty_gold_docs():
     scored = score({"answer": "Je ne sais pas.", "gold_docs": []}, {
         "answer": "Je ne sais pas.",
-        "cited_sources": [],
-        "retrieved_doc_ids": ["DOC1"],
+        "citations": [],
+        "retrieved_ids": ["DOC1"],
     })
     assert scored["answer_token_f1"] == 1
     assert scored["retrieved_doc_recall"] is None
@@ -86,15 +86,18 @@ def test_token_f1_uses_token_overlap():
 
 
 def test_summarize_and_write_official_results_jsonl(tmp_path):
+    import p4_eval
+
     row = {
         "backend": "local-rag",
+        "mode": "rag",
         "id": "q001",
         "question": "Question ?",
         "gold_answer": "Réponse",
         "gold_docs": ["DOC1"],
         "answer": "Réponse",
-        "cited_sources": ["DOC1"],
-        "retrieved_doc_ids": ["DOC1"],
+        "citations": ["DOC1"],
+        "retrieved_ids": ["DOC1"],
         "tokens_in": 10,
         "tokens_out": 4,
         "latency_ms": 100.0,
@@ -113,10 +116,15 @@ def test_summarize_and_write_official_results_jsonl(tmp_path):
 
     saved = json.loads((tmp_path / "results.jsonl").read_text(encoding="utf-8"))
     assert saved["answer"] == "Réponse"
-    assert saved["cited_sources"] == ["DOC1"]
-    assert saved["retrieved_doc_ids"] == ["DOC1"]
+    assert saved["citations"] == ["DOC1"]
+    assert saved["retrieved_ids"] == ["DOC1"]
     assert saved["tool_calls"] == [{"name": "search_articles"}]
     assert (tmp_path / "comparison.md").exists()
+
+    validated = p4_eval.load_results(tmp_path / "results.jsonl", {"q001": {"id": "q001"}})
+    assert validated["q001"]["citations"] == ["DOC1"]
+    assert validated["q001"]["retrieved_ids"] == ["DOC1"]
+    assert validated["q001"]["mode"] == "rag"
 
 
 def test_summary_does_not_underreport_partial_costs():

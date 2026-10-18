@@ -32,25 +32,30 @@ uv run python -m src.ingest.build
 
 ## Evaluation
 
-`eval/golden.jsonl` contains one JSON object per line using the assignment schema:
+`eval/golden.jsonl` contains 40 verified legal questions on the apprenticeship corpus (`factual`, `synthesis`, `calculation`, `historical`, `out_of_scope`, `injection`):
 
 ```json
-{"id":"q017","question":"Quel est le délai pour contester une amende forfaitaire ?","answer":"45 jours","gold_docs":["F1234"]}
+{"id":"q001","question":"Quel est l’objet du contrat d’apprentissage et quelle formation permet-il d’obtenir ?","answer":"...","gold_docs":["LEGIARTI000037385863"]}
 ```
 
-`F1234` above is only the assignment's placeholder: replace it with a real corpus document ID.
-`gold_docs` contains the IDs of documents that support the answer. Use `[]` when the corpus
-does not contain the answer. The `golden.jsonl` file is currently empty; add about 40 varied
-questions (answerable, unanswerable, and prompt-injection attempts) before running the command.
+`gold_docs` contains the `LEGIARTI...` version IDs of documents that support the answer (`[]` when the corpus does not contain the answer and abstention is expected).
 
 ```bash
 uv run python eval/run_eval.py --questions eval/golden.jsonl --out eval/
 ```
 
 This writes `eval/results.jsonl`, one row per question and backend, with the generated answer,
-cited sources, retrieved document IDs, token counts, latency, tool calls, stop reason, and
+`citations`, `retrieved_ids`, token counts, latency, tool calls, stop reason, and
 answer F1 / document recall. `summary.csv` and `comparison.md` report aggregate quality,
 latency, tokens, and cost. Run the local agent loop instead with `--local-mode agent`.
+
+To validate the golden dataset, run the Ollama LLM-as-a-judge, and generate the P4 analysis report:
+
+```bash
+uv run python eval/analysis/p4_eval.py validate --questions eval/golden.jsonl --expected-count 40
+uv run python eval/analysis/p4_eval.py judge --questions eval/golden.jsonl --results eval/results.jsonl --out eval/analysis/run01/judgments.jsonl
+uv run python eval/analysis/p4_eval.py report --questions eval/golden.jsonl --results eval/results.jsonl --judgments eval/analysis/run01/judgments.jsonl --out eval/analysis/run01/report
+```
 
 For API comparison, implement a Python callable taking `question: str` and returning a dict
 with the same fields as `AnswerTrace` (`answer`, `citations`, `retrieved_ids`, `tokens_in`,
