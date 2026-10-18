@@ -32,9 +32,40 @@ uv run python -m src.ingest.build
 
 ## Evaluation
 
-```bash
-uv run python eval/run_eval.py --questions eval/golden.jsonl --out eval/
+`eval/golden.jsonl` contains one JSON object per line. Add quality annotations to measure
+quality; without them, only the expected answer status is scored.
+
+```json
+{"id":"q001","question":"Quelle est la durée maximale d'un contrat d'apprentissage ?","expected_status":"answered","must_include":["trois ans"],"expected_citations":["LEGIARTI..."],"reference_answer":"La durée maximale est de trois ans."}
 ```
+
+Supported annotations: `expected_status` (`answered` by default), `must_include` (answer
+substrings, case-insensitive), `expected_citations` (expected `LEGIARTI...` IDs), and
+`reference_answer` (used for a lexical token F1, not semantic grading).
+
+```bash
+uv run python -m eval.run_eval --questions eval/golden.jsonl --out results/ --backend local --local-mode rag
+```
+
+Each run creates a timestamped directory containing predictions (`predictions.jsonl`),
+aggregates (`summary.csv`), and a comparison table (`comparison.md`). Run the agent instead
+with `--local-mode agent`. The table reports status accuracy, keyword/citation recall,
+optional answer token F1, latency percentiles, token counts, and cost. The quality score is the mean of the available keyword recall, citation recall, and
+lexical answer F1 for annotated questions. Status accuracy is reported separately.
+This score is a transparent deterministic proxy, not a semantic or human evaluation.
+
+For API comparison, implement a Python callable taking `question: str` and returning a dict
+with the same fields as `AnswerTrace` (`answer`, `citations`, `retrieved_ids`, `tokens_in`,
+`tokens_out`, `latency_ms`, `cost_eur`, `stop_reason`). Then run:
+
+```bash
+uv run python -m eval.run_eval --questions eval/golden.jsonl --out results/ \
+  --backend both --local-mode rag --api-adapter my_api_adapter:answer
+```
+
+The adapter is intentionally provider-specific; the repository does not currently include an
+API backend. Set `cost_eur` to `None` when pricing is unavailable so the report shows `N/A`.
+The local cost is the model's direct usage cost (zero); electricity and hardware are not included.
 
 ## Tests
 
