@@ -740,7 +740,7 @@ def install_llm_bridge() -> None:
     if not getattr(rag_mod, "_live_wrapped", False):
         orig_rag_search = rag_mod.search
 
-        def wrapped_rag_search(question: str, k: int = 5, filters: Any = None) -> Any:
+        def wrapped_rag_search(question: str, k: int = 5, filters: Any = None, **kwargs: Any) -> Any:
             emit_live_event({
                 "type": "tool_start",
                 "name": "search_articles",
@@ -749,7 +749,11 @@ def install_llm_bridge() -> None:
                 "detail": f"Recherche des {k} articles VIGUEUR les plus pertinents",
             })
             t0 = time.perf_counter()
-            hits = orig_rag_search(question, k=k, filters=filters) if filters is not None else orig_rag_search(question, k=k)
+            hits = (
+                orig_rag_search(question, k=k, filters=filters, **kwargs)
+                if filters is not None
+                else orig_rag_search(question, k=k, **kwargs)
+            )
             elapsed_ms = round((time.perf_counter() - t0) * 1000.0, 1)
             nums = [h.metadata.get("num", "") for h in hits if hasattr(h, "metadata")]
             emit_live_event({
@@ -765,5 +769,32 @@ def install_llm_bridge() -> None:
 
         rag_mod.search = wrapped_rag_search
         rag_mod._live_wrapped = True  # type: ignore[attr-defined]
+
+
+def api_answer(question: str) -> dict[str, Any]:
+    """Adapter for `eval/run_eval.py --api-adapter app.api_llm:api_answer`."""
+    from dataclasses import asdict
+    from src.agent.answer import answer
+
+    install_llm_bridge()
+    dotenv = read_dotenv_vars()
+    avail = get_available_api_models()
+    api_model = (
+        dotenv.get("API_MODEL")
+        or os.environ.get("API_MODEL")
+        or (avail[0] if avail else "google/gemini-2.5-flash")
+    )
+    api_mode = dotenv.get("API_MODE") or os.environ.get("API_MODE") or "rag"
+    prev_model = llm.MODEL
+    try:
+        llm.MODEL = api_model
+        trace = asdict(answer(question, mode=api_mode))
+        trace["cost_eur"] = compute_api_cost_eur(
+            api_model, int(trace.get("tokens_in") or 0), int(trace.get("tokens_out") or 0)
+        )
+        trace["mode"] = api_mode
+        return trace
+    finally:
+        llm.MODEL = prev_model
 
 

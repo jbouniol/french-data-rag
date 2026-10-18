@@ -48,10 +48,11 @@ from src.agent.tools import (
     SMIC_MONTHLY_GROSS,
     compute_remuneration,
     get_article_at_date,
+    load_versions,
     normalize_num,
     smic_at,
 )
-from src.retrieval.search import search
+from src.retrieval.search import load_articles, search
 
 # Prevent macOS Metal (MPS) command-buffer assertion crashes when serving
 # SentenceTransformer / CrossEncoder across ThreadingHTTPServer worker threads.
@@ -66,21 +67,18 @@ _INFERENCE_LOCK = threading.Lock()
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 STATIC_DIR = Path(__file__).resolve().parent / "static"
-ARTICLES_PATH = ROOT_DIR / "data" / "processed" / "articles.parquet"
-VERSIONS_PATH = ROOT_DIR / "data" / "processed" / "article_versions.parquet"
 GOLDEN_PATH = ROOT_DIR / "eval" / "golden.jsonl"
 RESULTS_PATH = ROOT_DIR / "eval" / "results.jsonl"
 SUMMARY_PATH = ROOT_DIR / "eval" / "summary.csv"
 
 
-@lru_cache(maxsize=1)
 def _load_versions_df() -> pd.DataFrame:
-    return pd.read_parquet(VERSIONS_PATH)
+    return load_versions()
 
 
-@lru_cache(maxsize=1)
 def _load_articles_df() -> pd.DataFrame:
-    return pd.read_parquet(ARTICLES_PATH)
+    df, _ = load_articles()
+    return df
 
 
 @lru_cache(maxsize=1)
@@ -966,9 +964,10 @@ class AlterEgoRequestHandler(SimpleHTTPRequestHandler):
         k = max(1, min(10, int(body.get("k", 5))))
         use_reranker = bool(body.get("use_reranker", True))
 
+        search_mode = "hybrid_rerank" if use_reranker else "hybrid"
         t0 = dt.datetime.now()
         with _INFERENCE_LOCK:
-            hits = search(query, k=k, filters={"use_reranker": use_reranker})
+            hits = search(query, k=k, mode=search_mode)
         elapsed_ms = round((dt.datetime.now() - t0).total_seconds() * 1000, 1)
 
         serialized_hits = []
