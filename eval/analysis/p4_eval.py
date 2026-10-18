@@ -18,6 +18,8 @@ from typing import Literal
 import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
 
 CORPUS = Path("data/processed/article_versions.parquet")
 SYSTEM = r"""# Consigne du juge P4
@@ -258,9 +260,9 @@ def judge_one(payload, model, timeout):
     import ollama
     prompt = SYSTEM
     data = json.dumps(payload, ensure_ascii=False, default=str)
-    # A conservative byte bound leaves space for the chat template and output.
+    # A conservative token estimate (~3 UTF-8 bytes/token) leaves space for template and output.
     # Refuse long evidence rather than letting Ollama discard source text.
-    if len((prompt + data).encode("utf-8")) + 3072 > JUDGE_CTX:
+    if len((prompt + data).encode("utf-8")) // 3 + 1024 > JUDGE_CTX:
         raise ContextLimitError("complete evidence exceeds the judge context")
     response = ollama.Client(timeout=timeout).chat(
         model=model, messages=[{"role": "system", "content": prompt}, {"role": "user", "content": data}],
@@ -388,7 +390,6 @@ def main(argv=None):
                 raise ValueError("choose a new output file and positive timeout/context limit")
             model = args.model
             if not model:
-                sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
                 from src.agent.llm import MODEL
                 model = MODEL
             payloads = {key: judge_payload(q, results[key], corpus, annotations.get(key, {})) for key, q in questions.items()}

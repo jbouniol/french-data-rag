@@ -3,14 +3,12 @@ from dataclasses import asdict
 from datetime import date
 import json
 from pathlib import Path
-import sys
 
 import httpx
 import ollama
 import pandas as pd
 import pytest
 
-sys.path.insert(0, str(Path(__file__).parent))
 import p4_eval as E
 from src.agent.answer import AnswerTrace
 
@@ -375,4 +373,4 @@ def test_judge_refuses_long_evidence_before_calling_ollama(monkeypatch):
 
     monkeypatch.setattr(ollama, "Client", unexpected_client)
     with pytest.raises(E.ContextLimitError):
-        E.judge_one({"evidence": "x" * E.JUDGE_CTX}, "synthetic", timeout=2)
+        E.judge_one({"evidence": "x" * (E.JUDGE_CTX * 3)}, "synthetic", timeout=2)

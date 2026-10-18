@@ -19,5 +19,5 @@ dependencies = [
 dev = ["pytest>=8"]
 
 [tool.pytest.ini_options]
-pythonpath = ["."]
-testpaths = ["tests"]
+pythonpath = [".", "eval/analysis"]
+testpaths = ["tests", "eval/analysis"]
