@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Alter-Ego</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <!-- Ethereal Radial Blue Glow Background -->
+  <div class="ambient-glow" aria-hidden="true"></div>
+
+  <div class="app-shell" id="app-shell">
+    <!-- Floating Minimal Top Corners -->
+    <header class="top-bar">
+      <button class="corner-brand-pill" onclick="resetToHome()" title="Home">
+        <svg viewBox="0 0 64 64" width="20" height="20" fill="none" aria-hidden="true">
+          <polygon points="32,12 54,22 32,32 10,22" fill="#1A73E8"/>
+          <path d="M20 28V36C20 40 25.4 43 32 43C38.6 43 44 40 44 36V28L32 33.5L20 28Z" fill="#1A73E8"/>
+          <path d="M32 22L48 25.5L50.5 36" stroke="#F9AB00" stroke-width="2.8" stroke-linecap="round"/>
+          <path d="M17 45.5C20.8 48.8 25.8 50.5 31 50.5" stroke="#D93025" stroke-width="4" stroke-linecap="round"/>
+          <path d="M33 50.5C38.2 50.5 43.2 48.8 47 45.5" stroke="#188038" stroke-width="4" stroke-linecap="round"/>
+        </svg>
+        <span class="brand-name">Alter-<span class="brand-blue">Ego</span></span>
+      </button>
+
+      <div class="top-right-pills">
+        <div class="api-popover-anchor">
+          <button class="floating-pill" id="ollama-pill" onclick="toggleApiPopover()" title="Configuration clé API selon le modèle (.env)">
+            <span class="status-dot" id="ollama-dot"></span>
+            <span id="ollama-status-text">Local · 540 articles</span>
+          </button>
+
+          <!-- Provider-aware API Key Popover (OpenRouter & Anthropic, syncs with .env) -->
+          <div class="api-popover hidden" id="api-popover">
+            <div class="api-provider-tabs" role="tablist">
+              <button
+                type="button"
+                class="api-provider-tab active"
+                id="api-tab-openrouter"
+                onclick="selectApiPopoverProvider('openrouter')"
+              >
+                <span class="provider-mini-dot" id="provider-dot-openrouter"></span>
+                OpenRouter
+              </button>
+              <button
+                type="button"
+                class="api-provider-tab"
+                id="api-tab-anthropic"
+                onclick="selectApiPopoverProvider('anthropic')"
+              >
+                <span class="provider-mini-dot" id="provider-dot-anthropic"></span>
+                Anthropic
+              </button>
+            </div>
+            <div class="api-popover-header">
+              <span class="mono" id="api-popover-title" style="font-size:0.68rem; font-weight:600; color:var(--blue)">OPENROUTER API · .ENV</span>
+              <span class="api-key-badge" id="api-key-badge">Checking…</span>
+            </div>
+            <p class="api-popover-desc" id="api-popover-desc">
+              Collez votre clé <span class="mono" id="api-env-var-label">OPENROUTER_API_KEY</span> dans <span class="mono">.env</span> ou directement ici :
+            </p>
+            <div class="api-input-row">
+              <input
+                type="password"
+                id="api-key-input"
+                class="api-key-input mono"
+                placeholder="sk-or-v1-..."
+                autocomplete="off"
+                onkeydown="if(event.key==='Enter'){event.preventDefault();saveApiKeyFromUi();}"
+              />
+              <button class="api-save-btn" onclick="saveApiKeyFromUi()">Save</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Session Chat History Button & Popover -->
+        <div class="history-popover-anchor">
+          <button class="floating-icon-pill" id="history-btn" onclick="toggleHistoryPopover()" title="Historique de la session">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 12a9 9 0 1 0 3-6.7L3 8" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M3 3v5h5" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M12 7v5l3 2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span class="history-count-badge hidden" id="history-count-badge">0</span>
+          </button>
+
+          <div class="history-popover hidden" id="history-popover">
+            <div class="history-popover-header">
+              <span class="mono" style="font-size:0.68rem; font-weight:600; color:var(--text-secondary)">HISTORIQUE DE SESSION</span>
+              <button class="history-clear-btn hidden" id="history-clear-btn" onclick="clearSessionHistory()">Tout effacer</button>
+            </div>
+            <div class="history-list" id="history-list">
+              <!-- Populated by app.js -->
+            </div>
+          </div>
+        </div>
+
+        <button class="floating-icon-pill is-empty-chat" id="new-chat-btn" onclick="handleNewChatClick()" title="Nouvelle conversation">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 5v14M5 12h14" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Stage -->
+    <div class="stage-wrapper">
+      <main class="main-column" id="main-column">
+        <!-- =============================================================== -->
+        <!-- HOME / CENTERED STAGE                                           -->
+        <!-- =============================================================== -->
+        <section class="home-stage" id="home-stage">
+          <div class="title-row">
+            <h1 class="hero-title">
+              Know your <span class="hero-blue">apprentice rights.</span>
+            </h1>
+            <span class="version-tag mono" id="model-version-tag">gemma4:12b</span>
+          </div>
+
+          <!-- Central Floating Prompt Card -->
+          <div class="prompt-card" id="home-prompt-card">
+            <textarea
+              id="home-input"
+              rows="1"
+              placeholder="Ask Alter-Ego"
+              oninput="autoGrow(this)"
+              onkeydown="if(event.key==='Enter' && !event.shiftKey){ event.preventDefault(); submitFromHome(); }"
+            ></textarea>
+
+            <div class="prompt-card-Bottom">
+              <div class="prompt-left-tools">
+                <span class="engine-name">Code du travail</span>
+              </div>
+
+              <div class="prompt-right-tools">
+                <div class="model-select-wrap" title="Select downloaded Ollama model">
+                  <select id="home-model-select" class="model-select mono" onchange="selectOllamaModel(this.value)">
+                    <option value="">Loading models…</option>
+                  </select>
+                </div>
+                <button class="send-circle-btn" id="home-send-btn" onclick="submitFromHome()" title="Ask Alter-Ego">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                    <path d="M5 12h14M13 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Centered Segmented Toggle ("Agent | RAG") -->
+          <div class="center-segmented-wrap">
+            <div class="segmented-pill">
+              <button class="seg-opt active" id="seg-agent" onclick="setMode('agent')">Agent</button>
+              <button class="seg-opt" id="seg-rag" onclick="setMode('rag')">RAG</button>
+            </div>
+          </div>
+
+          <!-- Borderless Minimalist Suggestion List -->
+          <div class="suggestions-list" id="suggestions-list">
+            <!-- Populated by app.js -->
+          </div>
+        </section>
+
+        <!-- =============================================================== -->
+        <!-- CONVERSATION VIEW (100% Live Execution)                         -->
+        <!-- =============================================================== -->
+        <section class="chat-view hidden" id="chat-view">
+          <div class="user-row">
+            <div class="user-pill" id="user-question-text"></div>
+          </div>
+
+          <div class="assistant-card">
+            <!-- Discreet Collapsible Tool Trace (Collapsed by default, expandable for demo detail) -->
+            <div class="trace-drawer collapsed" id="trace-accordion">
+              <button class="trace-pill-trigger" onclick="toggleTraceSteps()" title="Click to inspect tool calls and arguments">
+                <div class="trace-trigger-left">
+                  <span class="trace-dot" id="trace-dot"></span>
+                  <span class="trace-label" id="trace-summary-text">Reasoning &amp; tools</span>
+                  <div class="trace-chips" id="trace-chips"></div>
+                </div>
+                <div class="trace-trigger-right">
+                  <span class="trace-hint" id="trace-toggle-hint">Details</span>
+                  <svg class="trace-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M6 9l6 6 6-6" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </div>
+              </button>
+
+              <!-- Expanded Detailed Tool Trace Cards -->
+              <div class="trace-details-panel" id="trace-steps-body"></div>
+            </div>
+
+            <!-- Answer Prose -->
+            <div class="answer-body" id="answer-body"></div>
+
+            <!-- Clickable Source Pills + Telemetry -->
+            <div class="answer-footer" id="answer-footer">
+              <div class="source-pills-row" id="source-pills-row"></div>
+              <div class="meta-line" id="meta-line"></div>
+            </div>
+          </div>
+
+          <!-- Floating Bottom Prompt Card (No scenario pills, no rerun button) -->
+          <div class="bottom-dock">
+            <div class="prompt-card compact">
+              <textarea
+                id="chat-input"
+                rows="1"
+                placeholder="Ask a follow-up question…"
+                oninput="autoGrow(this)"
+                onkeydown="if(event.key==='Enter' && !event.shiftKey){ event.preventDefault(); submitFromChat(); }"
+              ></textarea>
+              <div class="prompt-card-Bottom">
+                <div class="prompt-left-tools">
+                  <button class="subtle-tool-btn" onclick="resetToHome()">
+                    <span>← New question</span>
+                  </button>
+                </div>
+                <div class="prompt-right-tools">
+                  <div class="segmented-pill mini">
+                    <button class="seg-opt active" id="chat-seg-agent" onclick="setMode('agent')">Agent</button>
+                    <button class="seg-opt" id="chat-seg-rag" onclick="setMode('rag')">RAG</button>
+                  </div>
+                  <div class="model-select-wrap" title="Select downloaded Ollama model">
+                    <select id="chat-model-select" class="model-select mono" onchange="selectOllamaModel(this.value)">
+                      <option value="">Loading models…</option>
+                    </select>
+                  </div>
+                  <button class="send-circle-btn" id="chat-send-btn" onclick="submitFromChat()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                      <path d="M5 12h14M13 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <!-- Floating Légifrance Source Inspector Card (Right Side) -->
+      <aside class="source-panel hidden" id="source-panel">
+        <div class="source-panel-header">
+          <div>
+            <span class="panel-eyebrow mono">CODE DU TRAVAIL · LÉGIFRANCE</span>
+            <h3 class="panel-title" id="panel-title">Article</h3>
+          </div>
+          <button class="tool-icon-btn" onclick="closeSourcePanel()" title="Close">✕</button>
+        </div>
+
+        <div class="panel-tabs" id="panel-tabs"></div>
+        <div class="panel-widget hidden" id="panel-widget"></div>
+        <div class="panel-content" id="panel-content"></div>
+      </aside>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
