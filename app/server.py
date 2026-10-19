@@ -1100,3 +1100,13 @@ def run_server(host: str = "127.0.0.1", port: int = 8000, open_browser: bool = F
         print("\nShutting down Alter-Ego server...")
     finally:
         server.server_close()
+
+
+if __name__ == "__main__":
+    import sys
+
+    ROOT = Path(__file__).resolve().parent.parent
+    if str(ROOT) not in sys.path:
+        sys.path.insert(0, str(ROOT))
+    run_server(open_browser="--open" in sys.argv)
+

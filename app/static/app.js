@@ -116,6 +116,70 @@ function fitSelectWidth(sel) {
   sel.style.width = `${textWidth + 36}px`;
 }
 
+function getModelBrandFamily(modelId) {
+  const id = String(modelId || '').toLowerCase();
+  if (id.includes('openai/') || id.startsWith('gpt-') || id.startsWith('o1') || id.startsWith('o3')) {
+    return 'openai';
+  }
+  if (id.includes('mistral') || id.startsWith('ministral') || id.startsWith('codestral')) {
+    return 'mistral';
+  }
+  if (id.includes('anthropic/') || id.startsWith('claude-')) {
+    return 'anthropic';
+  }
+  return 'gemini';
+}
+
+function getModelBrandLogoSvg(modelId) {
+  const family = getModelBrandFamily(modelId);
+  if (family === 'openai') {
+    // Official OpenAI blossom mark
+    return `
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="#10A37F" aria-hidden="true">
+        <path d="M22.282 9.821a5.985 5.985 0 0 0-.516-4.91 6.046 6.046 0 0 0-6.51-2.9A6.065 6.065 0 0 0 4.981 4.18a5.985 5.985 0 0 0-3.998 2.9 6.046 6.046 0 0 0 .743 7.097 5.98 5.98 0 0 0 .51 4.911 6.051 6.051 0 0 0 6.515 2.9A5.985 5.985 0 0 0 13.26 24a6.056 6.056 0 0 0 5.772-4.206 5.99 5.99 0 0 0 3.997-2.9 6.056 6.056 0 0 0-.747-7.073zM13.26 22.43a4.476 4.476 0 0 1-2.876-1.04l.141-.081 4.779-2.758a.795.795 0 0 0 .392-.681v-6.737l2.02 1.168a.071.071 0 0 1 .038.052v5.583a4.504 4.504 0 0 1-4.494 4.494zM3.6 18.304a4.47 4.47 0 0 1-.535-3.014l.142.085 4.783 2.759a.771.771 0 0 0 .78 0l5.843-3.369v2.332a.08.08 0 0 1-.033.062L9.74 19.95a4.5 4.5 0 0 1-6.14-1.646zM2.34 7.896a4.485 4.485 0 0 1 2.366-1.973V11.6a.766.766 0 0 0 .388.676l5.815 3.355-2.02 1.168a.076.076 0 0 1-.071 0l-4.83-2.786A4.504 4.504 0 0 1 2.34 7.872zm16.597 3.855l-5.833-3.387L15.119 7.2a.076.076 0 0 1 .071 0l4.83 2.791a4.494 4.494 0 0 1-.676 8.105v-5.678a.79.79 0 0 0-.407-.667zm2.01-3.023l-.141-.085-4.774-2.782a.776.776 0 0 0-.785 0L9.409 9.23V6.897a.066.066 0 0 1 .028-.061l4.83-2.787a4.5 4.5 0 0 1 6.68 4.66zm-12.64 4.135l-2.02-1.164a.08.08 0 0 1-.038-.057V6.075a4.5 4.5 0 0 1 7.375-3.453l-.142.08-4.778 2.758a.795.795 0 0 0-.393.681zm1.097-2.365l2.602-1.5 2.607 1.5v2.999l-2.597 1.5-2.607-1.5z"/>
+      </svg>
+    `;
+  }
+  if (family === 'mistral') {
+    // Official Mistral AI 5-band stepped M mark
+    return `
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" aria-hidden="true">
+        <rect x="3" y="3" width="3.8" height="3.6" fill="#FFD800"/>
+        <rect x="17.2" y="3" width="3.8" height="3.6" fill="#FFD800"/>
+        <rect x="3" y="6.6" width="7.4" height="3.6" fill="#FFAF00"/>
+        <rect x="13.6" y="6.6" width="7.4" height="3.6" fill="#FFAF00"/>
+        <rect x="3" y="10.2" width="18" height="3.6" fill="#FF8205"/>
+        <rect x="3" y="13.8" width="3.8" height="3.6" fill="#FA500F"/>
+        <rect x="10.1" y="13.8" width="3.8" height="3.6" fill="#FA500F"/>
+        <rect x="17.2" y="13.8" width="3.8" height="3.6" fill="#FA500F"/>
+        <rect x="1" y="17.4" width="7.6" height="3.6" fill="#E10500"/>
+        <rect x="15.4" y="17.4" width="7.6" height="3.6" fill="#E10500"/>
+      </svg>
+    `;
+  }
+  if (family === 'anthropic') {
+    // Official Anthropic monogram mark
+    return `
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="#D97757" aria-hidden="true">
+        <path d="M17.304 3.541h-3.672l6.696 16.918H24Zm-10.608 0L0 20.459h3.744l1.37-3.553h7.005l1.369 3.553h3.744L10.536 3.541Zm-.371 10.223L8.616 7.82l2.291 5.945Z"/>
+      </svg>
+    `;
+  }
+  // Google Gemini / Gemma 4-point sparkle
+  return `
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" aria-hidden="true">
+      <defs>
+        <linearGradient id="gemini-pill-grad" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#1A73E8"/>
+          <stop offset="52%" stop-color="#6366F1"/>
+          <stop offset="100%" stop-color="#A855F7"/>
+        </linearGradient>
+      </defs>
+      <path d="M12 1.5C12 7.3 16.7 12 22.5 12C16.7 12 12 16.7 12 22.5C12 16.7 7.3 12 1.5 12C7.3 12 12 7.3 12 1.5Z" fill="url(#gemini-pill-grad)"/>
+    </svg>
+  `;
+}
+
 function applyOllamaStatus(ollama) {
   const dot = document.getElementById('ollama-dot');
   const statusText = document.getElementById('ollama-status-text');
@@ -142,7 +206,10 @@ function applyOllamaStatus(ollama) {
   const modelReady =
     provider === 'local' ? Boolean(ollama.online) : isProviderConfigured(provider);
 
-  if (dot) dot.classList.toggle('offline', !modelReady);
+  if (dot) {
+    dot.innerHTML = getModelBrandLogoSvg(state.selectedModel);
+    dot.classList.toggle('offline', !modelReady);
+  }
   if (statusText) {
     if (provider === 'anthropic') {
       statusText.textContent = isProviderConfigured('anthropic')
@@ -284,6 +351,7 @@ async function selectOllamaModel(modelName) {
     });
     const ollama = await res.json();
     applyOllamaStatus(ollama);
+    triggerMorphAnimation(document.getElementById('ollama-dot'), 'morphing');
     triggerMorphAnimation(document.getElementById('model-version-tag'), 'morphing');
     triggerMorphAnimation(document.getElementById('ollama-status-text'), 'morphing');
     // If user selected a cloud model (OpenRouter or Anthropic) and hasn't put that provider's key in .env yet, open the popover on the right provider
@@ -1030,9 +1098,10 @@ function renderConversationTurn(data, turnIdx = 0, { autoOpenPanel = true } = {}
   const extCalls = toolCalls.filter((tc) => tc.name && tc.name !== 'final_answer');
 
   // 1. Discreet Summary Pill
+  const isRagMode = data.mode === 'rag';
   const summaryEl = document.getElementById(`trace-summary-text-${turnIdx}`);
   if (summaryEl) {
-    if (data.mode === 'rag' && extCalls.length === 0) {
+    if (isRagMode) {
       summaryEl.textContent = 'Hybrid RAG retrieval';
     } else if (extCalls.length > 0) {
       summaryEl.textContent = `${extCalls.length} tool${extCalls.length > 1 ? 's' : ''} called`;
@@ -1041,23 +1110,28 @@ function renderConversationTurn(data, turnIdx = 0, { autoOpenPanel = true } = {}
     }
   }
 
-  const uniqueTools = [...new Set(extCalls.map((t) => t.name))];
-  const chipsHtml = uniqueTools
-    .map((t) => `<span class="trace-chip">${escapeHtml(t)}</span>`)
-    .join('');
   const chipsEl = document.getElementById(`trace-chips-${turnIdx}`);
   if (chipsEl) {
-    chipsEl.innerHTML = chipsHtml + `<span class="trace-chip verified">check_final ✓</span>`;
+    if (isRagMode) {
+      chipsEl.innerHTML = `<span class="trace-chip">BM25 + bge-m3 + reranker</span><span class="trace-chip verified">RagAnswer ✓</span>`;
+    } else {
+      const uniqueTools = [...new Set(extCalls.map((t) => t.name))];
+      const chipsHtml = uniqueTools
+        .map((t) => `<span class="trace-chip">${escapeHtml(t)}</span>`)
+        .join('');
+      chipsEl.innerHTML = chipsHtml + `<span class="trace-chip verified">check_final ✓</span>`;
+    }
   }
 
   // 2. Detailed Tool Step Cards (Visible when user clicks the trace pill during demo)
   const stepsEl = document.getElementById(`trace-steps-body-${turnIdx}`);
   if (stepsEl) {
-    if (toolCalls.length > 0) {
-      stepsEl.innerHTML = toolCalls.map((tc, idx) => renderToolStepCard(tc, idx + 1)).join('');
-    } else {
-      // Single-pass RAG mode trace card
+    if (isRagMode) {
+      // Single-pass RAG mode trace card (no agentic tool calls)
       const retrievedCount = (data.retrieved_ids || []).length;
+      const ragSearch = toolCalls[0] || {};
+      const ragMs = ragSearch.latency_ms != null ? `${ragSearch.latency_ms} ms` : `${retrievedCount} chunks`;
+      const ragNums = Array.isArray(ragSearch.result) ? ragSearch.result.join(', ') : '';
       stepsEl.innerHTML = `
         <div class="trace-step-card">
           <div class="trace-step-top">
@@ -1065,11 +1139,15 @@ function renderConversationTurn(data, turnIdx = 0, { autoOpenPanel = true } = {}
               <span class="trace-step-num">RAG</span>
               <span class="trace-step-fn">search(BM25 + bge-m3 + RRF + bge-reranker-v2-m3)</span>
             </div>
-            <span class="trace-step-latency">${retrievedCount} chunks</span>
+            <span class="trace-step-latency">${escapeHtml(ragMs)}</span>
           </div>
-          <div class="trace-step-obs">Retrieved ${retrievedCount} VIGUEUR articles → Constrained RagAnswer JSON → check_final() verified</div>
+          <div class="trace-step-obs">Retrieved ${retrievedCount} VIGUEUR articles${ragNums ? ` (${escapeHtml(ragNums)})` : ''} → Constrained RagAnswer JSON → check() verified</div>
         </div>
       `;
+    } else if (toolCalls.length > 0) {
+      stepsEl.innerHTML = toolCalls.map((tc, idx) => renderToolStepCard(tc, idx + 1)).join('');
+    } else {
+      stepsEl.innerHTML = '';
     }
   }
 
@@ -1292,14 +1370,15 @@ async function openSourcePanel(docId, turnIdx = null) {
           .join('')
       : '';
 
-  // Keep the SMIC table widget at the top when viewing D6222-26
+  // Only show the SMIC table widget at the top when viewing D6222-26 AND the Agent actually called compute_remuneration
   const widgetEl = document.getElementById('panel-widget');
-  if (target.num === 'D6222-26') {
-    const remCall = ((state.currentTrace && state.currentTrace.tool_calls) || []).find(
-      (tc) => tc.name === 'compute_remuneration'
-    );
-    const age = (remCall && remCall.arguments && remCall.arguments.age) || 21;
-    const yr = (remCall && remCall.arguments && remCall.arguments.contract_year) || 1;
+  const remCall =
+    state.currentTrace && state.currentTrace.mode !== 'rag'
+      ? ((state.currentTrace.tool_calls || []).find((tc) => tc.name === 'compute_remuneration') || null)
+      : null;
+  if (target.num === 'D6222-26' && remCall) {
+    const age = (remCall.arguments && remCall.arguments.age) || 21;
+    const yr = (remCall.arguments && remCall.arguments.contract_year) || 1;
     await renderSmicWidget(widgetEl, age, yr);
   } else {
     widgetEl.classList.add('hidden');

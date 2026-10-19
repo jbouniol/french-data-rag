@@ -237,16 +237,28 @@ body.is-thinking .ambient-glow {
 }
 
 .status-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--green);
-  box-shadow: 0 0 0 3px rgba(24, 128, 56, 0.14);
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s ease, filter 0.2s ease;
+}
+
+.status-dot svg {
+  width: 15px;
+  height: 15px;
+  display: block;
 }
 
 .status-dot.offline {
-  background: var(--amber);
-  box-shadow: 0 0 0 3px rgba(217, 107, 0, 0.15);
+  opacity: 0.52;
+  filter: saturate(0.35);
+}
+
+.status-dot.morphing {
+  animation: textFlipMorph 0.38s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .floating-icon-pill {
