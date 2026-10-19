@@ -167,6 +167,63 @@ def get_configured_api_keys() -> dict[str, str]:
     return keys
 
 
+_ANTHROPIC_MODELS_CACHE: dict[str, list[str]] = {}
+
+
+def discover_anthropic_models(api_key: str) -> list[str]:
+    """Query `GET /v1/models` for the given Anthropic API key (cached in memory) so any account's available models work."""
+    key = (api_key or "").strip()
+    if not key:
+        return []
+    if key in _ANTHROPIC_MODELS_CACHE:
+        return _ANTHROPIC_MODELS_CACHE[key]
+    req = urllib.request.Request(
+        "https://api.anthropic.com/v1/models",
+        headers={
+            "x-api-key": key,
+            "anthropic-version": "2023-06-01",
+        },
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=1.5) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            ids = [str(m.get("id")) for m in (data.get("data") or []) if m.get("id")]
+            if ids:
+                _ANTHROPIC_MODELS_CACHE[key] = ids
+                return ids
+    except Exception:
+        pass
+    return []
+
+
+def get_effective_api_catalog() -> dict[str, dict[str, Any]]:
+    """Return the cloud model catalog adapted to the Anthropic models available on the current machine's API key."""
+    catalog = dict(API_MODEL_CATALOG)
+    ant_key = get_anthropic_key()
+    live_ant = discover_anthropic_models(ant_key) if ant_key else []
+    if live_ant:
+        # Remove hardcoded Anthropic IDs that are not on this account and add top live Sonnet/Haiku IDs
+        for k in [m for m, v in list(catalog.items()) if v.get("provider") == "anthropic"]:
+            if k not in live_ant:
+                catalog.pop(k, None)
+        preferred = [
+            m
+            for m in live_ant
+            if ("sonnet" in m or "haiku" in m) and not m.endswith("20251001")
+        ][:4] or live_ant[:3]
+        for m in preferred:
+            if m not in catalog:
+                is_haiku = "haiku" in m
+                catalog[m] = {
+                    "provider": "anthropic",
+                    "label": re.sub(r"-\d{8}$", "", m),
+                    "in_eur_per_1m": 0.92 if is_haiku else 2.76,
+                    "out_eur_per_1m": 4.60 if is_haiku else 13.80,
+                }
+    return catalog
+
+
 def get_model_provider(model_id: str) -> str:
     """Return `'anthropic'`, `'openrouter'`, or `'local'` for a given `model_id`."""
     resolved = _MODEL_ALIASES.get(str(model_id or ""), str(model_id or ""))
@@ -183,9 +240,10 @@ def get_model_provider(model_id: str) -> str:
 def get_available_api_models() -> list[str]:
     """Return the list of cloud model IDs whose provider key is configured."""
     keys = get_configured_api_keys()
+    catalog = get_effective_api_catalog()
     return [
         m_id
-        for m_id, meta in API_MODEL_CATALOG.items()
+        for m_id, meta in catalog.items()
         if meta.get("provider") in keys
     ]
 
@@ -436,6 +494,13 @@ def _chat_anthropic_direct(
             ant_messages[-1]["content"] = ant_messages[-1]["content"] + schema_hint
         else:
             ant_messages.append({"role": "user", "content": schema_hint.strip()})
+
+    live_models = discover_anthropic_models(api_key)
+    if live_models and resolved_model not in live_models:
+        # Match closest family (haiku vs sonnet) available on this user's Anthropic account
+        family = "haiku" if "haiku" in resolved_model else "sonnet"
+        family_matches = [m for m in live_models if family in m]
+        resolved_model = family_matches[0] if family_matches else live_models[0]
 
     payload: dict[str, Any] = {
         "model": resolved_model,

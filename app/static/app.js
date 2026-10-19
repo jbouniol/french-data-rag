@@ -125,7 +125,7 @@ function applyOllamaStatus(ollama) {
   state.apiCatalog = ollama.api_catalog || {};
   state.hasApiKey = Boolean(ollama.has_api_key);
   state.configuredProviders = Array.isArray(ollama.configured_providers) ? ollama.configured_providers : [];
-  state.selectedModel = ollama.model || state.localModels[0] || 'gemma4:12b';
+  state.selectedModel = ollama.model || state.localModels[0] || 'gemma4:e4b-it-qat';
 
   renderModelSelectors();
 
@@ -214,7 +214,7 @@ function renderModelSelectors() {
     document.getElementById('chat-model-select'),
   ].filter(Boolean);
 
-  const localList = state.localModels.length > 0 ? state.localModels : ['gemma4:12b'];
+  const localList = state.localModels.length > 0 ? state.localModels : ['gemma4:e4b-it-qat'];
   const localOpts = localList
     .map((m) => {
       const sel = m === state.selectedModel ? 'selected' : '';

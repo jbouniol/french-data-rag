@@ -29,11 +29,14 @@ import webbrowser
 import pandas as pd
 import torch
 
+import os
+
 from app.api_llm import (
     API_MODEL_CATALOG,
     compute_api_cost_eur,
     get_available_api_models,
     get_configured_api_keys,
+    get_effective_api_catalog,
     get_model_provider,
     install_llm_bridge,
     is_api_model,
@@ -64,19 +67,43 @@ if hasattr(torch.backends, "mps") and hasattr(torch.backends.mps, "is_available"
 
 install_llm_bridge()
 _INFERENCE_LOCK = threading.Lock()
+_CORPUS_BUILD_LOCK = threading.Lock()
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
+# Ensure relative paths (`data/processed/...`, `data/index/...`) resolve from repo root on any machine
+try:
+    os.chdir(ROOT_DIR)
+except Exception:
+    pass
+
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 GOLDEN_PATH = ROOT_DIR / "eval" / "golden.jsonl"
 RESULTS_PATH = ROOT_DIR / "eval" / "results.jsonl"
 SUMMARY_PATH = ROOT_DIR / "eval" / "summary.csv"
+ARTICLES_PARQUET = ROOT_DIR / "data" / "processed" / "articles.parquet"
+VERSIONS_PARQUET = ROOT_DIR / "data" / "processed" / "article_versions.parquet"
+
+
+def _ensure_corpus_built() -> None:
+    """If running on a fresh clone where `data/processed/*.parquet` has not been built yet, build it automatically."""
+    if ARTICLES_PARQUET.exists() and VERSIONS_PARQUET.exists():
+        return
+    with _CORPUS_BUILD_LOCK:
+        if ARTICLES_PARQUET.exists() and VERSIONS_PARQUET.exists():
+            return
+        print("  [Init] data/processed/*.parquet not found — building corpus from AgentPublic/legi (first run)...")
+        from src.ingest.build import main as build_corpus_main
+
+        build_corpus_main()
 
 
 def _load_versions_df() -> pd.DataFrame:
+    _ensure_corpus_built()
     return load_versions()
 
 
 def _load_articles_df() -> pd.DataFrame:
+    _ensure_corpus_built()
     df, _ = load_articles()
     return df
 
@@ -509,8 +536,10 @@ DEMO_SCENARIOS: list[dict[str, Any]] = [
 
 
 def _discover_disk_ollama_models() -> list[str]:
-    """Read locally downloaded Ollama model manifests from ~/.ollama/models/manifests if daemon is asleep."""
-    manifests_root = Path.home() / ".ollama" / "models" / "manifests" / "registry.ollama.ai" / "library"
+    """Read locally downloaded Ollama model manifests from OLLAMA_MODELS or ~/.ollama/models/manifests."""
+    custom_models_dir = os.environ.get("OLLAMA_MODELS")
+    base_models_dir = Path(custom_models_dir) if custom_models_dir else (Path.home() / ".ollama" / "models")
+    manifests_root = base_models_dir / "manifests" / "registry.ollama.ai" / "library"
     discovered: list[str] = []
     if manifests_root.exists():
         try:
@@ -519,7 +548,9 @@ def _discover_disk_ollama_models() -> list[str]:
                     continue
                 for tag_file in sorted(model_dir.iterdir()):
                     if tag_file.is_file() and not tag_file.name.startswith("."):
-                        discovered.append(f"{model_dir.name}:{tag_file.name}")
+                        name = f"{model_dir.name}:{tag_file.name}"
+                        if "embed" not in name.lower():
+                            discovered.append(name)
         except Exception:
             pass
     return discovered
@@ -531,11 +562,15 @@ def check_ollama_status() -> dict[str, Any]:
     api_keys = get_configured_api_keys()
     configured_providers = list(api_keys.keys())
     has_api_key = bool(api_keys)
-    api_models = list(API_MODEL_CATALOG.keys())
+    effective_catalog = get_effective_api_catalog()
+    api_models = list(effective_catalog.keys())
     api_catalog = {
         k: {"label": v["label"], "provider": v.get("provider", "openrouter")}
-        for k, v in API_MODEL_CATALOG.items()
+        for k, v in effective_catalog.items()
     }
+    configured_api_models = [
+        k for k, v in effective_catalog.items() if v.get("provider") in configured_providers
+    ]
 
     try:
         req = urllib.request.Request(f"{host}/api/tags", method="GET")
@@ -548,9 +583,11 @@ def check_ollama_status() -> dict[str, Any]:
             ]
             if not local_models:
                 local_models = _discover_disk_ollama_models()
-            all_valid = local_models + api_models
-            if local_models and llm.MODEL not in all_valid and not is_api_model(llm.MODEL):
-                llm.MODEL = local_models[0]
+            if not is_api_model(llm.MODEL):
+                if local_models and llm.MODEL not in local_models:
+                    llm.MODEL = local_models[0]
+                elif not local_models and configured_api_models:
+                    llm.MODEL = configured_api_models[0]
             model = llm.MODEL
             model_provider = get_model_provider(model)
             model_ready = (model in local_models) or (
@@ -568,13 +605,15 @@ def check_ollama_status() -> dict[str, Any]:
                 "api_catalog": api_catalog,
                 "has_api_key": has_api_key,
                 "configured_providers": configured_providers,
-                "available_models": local_models + (api_models if has_api_key else []),
+                "available_models": local_models + configured_api_models,
             }
     except Exception:
         disk_models = _discover_disk_ollama_models()
-        all_valid = disk_models + api_models
-        if disk_models and llm.MODEL not in all_valid and not is_api_model(llm.MODEL):
-            llm.MODEL = disk_models[0]
+        if not is_api_model(llm.MODEL):
+            if configured_api_models:
+                llm.MODEL = configured_api_models[0]
+            elif disk_models and llm.MODEL not in disk_models:
+                llm.MODEL = disk_models[0]
         model = llm.MODEL
         model_provider = get_model_provider(model)
         return {
@@ -589,7 +628,7 @@ def check_ollama_status() -> dict[str, Any]:
             "api_catalog": api_catalog,
             "has_api_key": has_api_key,
             "configured_providers": configured_providers,
-            "available_models": disk_models + (api_models if has_api_key else []),
+            "available_models": disk_models + configured_api_models,
         }
 
 
@@ -1002,6 +1041,7 @@ def run_server(host: str = "127.0.0.1", port: int = 8000, open_browser: bool = F
     """Start the multi-threaded Alter-Ego Web Demo server."""
     mimetypes.add_type("application/javascript", ".js")
     mimetypes.add_type("text/css", ".css")
+    _ensure_corpus_built()
 
     def _prewarm() -> None:
         try:
@@ -1012,13 +1052,22 @@ def run_server(host: str = "127.0.0.1", port: int = 8000, open_browser: bool = F
 
     threading.Thread(target=_prewarm, daemon=True).start()
 
-    server = ThreadingHTTPServer((host, port), AlterEgoRequestHandler)
-    url = f"http://{host}:{port}"
+    server: ThreadingHTTPServer | None = None
+    active_port = port
+    for candidate_port in range(port, port + 15):
+        try:
+            server = ThreadingHTTPServer((host, candidate_port), AlterEgoRequestHandler)
+            active_port = candidate_port
+            break
+        except OSError:
+            continue
+    if server is None:
+        raise RuntimeError(f"Could not bind HTTP server on {host}:{port}-{port + 14}")
+
+    url = f"http://{host}:{active_port}"
     print(f"\n  Alter-Ego · Grounded Legal Intelligence for French Apprentices")
     print(f"  Daylight Keynote Demo UI running at: {url}\n")
     if open_browser:
-        import webbrowser
-
         webbrowser.open(url)
     try:
         server.serve_forever()
