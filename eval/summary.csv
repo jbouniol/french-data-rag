@@ -1,0 +1,2 @@
+backend,questions,errors,answer_token_f1,retrieved_doc_recall,cited_source_recall,avg_latency_ms,p50_latency_ms,p95_latency_ms,total_cost_eur,avg_cost_eur,tokens_in,tokens_out
+local-rag,40,0,0.46298888081741846,0.7638888888888888,0.4351851851851852,28685.0575,27478.25,46020.97,0.0,0.0,109485,3886
