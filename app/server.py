@@ -84,17 +84,32 @@ ARTICLES_PARQUET = ROOT_DIR / "data" / "processed" / "articles.parquet"
 VERSIONS_PARQUET = ROOT_DIR / "data" / "processed" / "article_versions.parquet"
 
 
+def _is_corpus_valid() -> bool:
+    """Return True only if both parquet files exist AND have the current schema (`chunk_text` column)."""
+    if not (ARTICLES_PARQUET.exists() and VERSIONS_PARQUET.exists()):
+        return False
+    try:
+        import pyarrow.parquet as pq
+
+        schema_names = set(pq.read_schema(ARTICLES_PARQUET).names)
+        return "chunk_text" in schema_names and "is_in_corpus" in schema_names
+    except Exception:
+        return False
+
+
 def _ensure_corpus_built() -> None:
-    """If running on a fresh clone where `data/processed/*.parquet` has not been built yet, build it automatically."""
-    if ARTICLES_PARQUET.exists() and VERSIONS_PARQUET.exists():
+    """If `data/processed/*.parquet` is missing or was built with an older schema (missing `chunk_text`), rebuild it automatically."""
+    if _is_corpus_valid():
         return
     with _CORPUS_BUILD_LOCK:
-        if ARTICLES_PARQUET.exists() and VERSIONS_PARQUET.exists():
+        if _is_corpus_valid():
             return
-        print("  [Init] data/processed/*.parquet not found — building corpus from AgentPublic/legi (first run)...")
+        print("  [Init] data/processed/*.parquet missing or outdated (missing 'chunk_text') — rebuilding corpus...")
         from src.ingest.build import main as build_corpus_main
 
         build_corpus_main()
+        load_articles.cache_clear()
+        load_versions.cache_clear()
 
 
 def _load_versions_df() -> pd.DataFrame:
