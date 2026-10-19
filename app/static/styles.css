@@ -1221,8 +1221,21 @@ body.is-thinking .ambient-glow {
   padding: 12px 0 36px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 22px;
   animation: springRise 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.chat-turns-list {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.chat-turn {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: springRise 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .user-row {
@@ -1710,7 +1723,10 @@ body.is-thinking .ambient-glow {
 }
 
 .bottom-dock {
-  margin-top: 4px;
+  position: sticky;
+  bottom: 18px;
+  z-index: 20;
+  margin-top: 6px;
 }
 
 .prompt-card.compact {

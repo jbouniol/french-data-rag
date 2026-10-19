@@ -166,45 +166,14 @@
         </section>
 
         <!-- =============================================================== -->
-        <!-- CONVERSATION VIEW (100% Live Execution)                         -->
+        <!-- CONVERSATION VIEW (Multi-Turn Live Execution Thread)            -->
         <!-- =============================================================== -->
         <section class="chat-view hidden" id="chat-view">
-          <div class="user-row">
-            <div class="user-pill" id="user-question-text"></div>
+          <div class="chat-turns-list" id="chat-turns-list">
+            <!-- Populated dynamically with .chat-turn items by app.js -->
           </div>
 
-          <div class="assistant-card">
-            <!-- Discreet Collapsible Tool Trace (Collapsed by default, expandable for demo detail) -->
-            <div class="trace-drawer collapsed" id="trace-accordion">
-              <button class="trace-pill-trigger" onclick="toggleTraceSteps()" title="Click to inspect tool calls and arguments">
-                <div class="trace-trigger-left">
-                  <span class="trace-dot" id="trace-dot"></span>
-                  <span class="trace-label" id="trace-summary-text">Reasoning &amp; tools</span>
-                  <div class="trace-chips" id="trace-chips"></div>
-                </div>
-                <div class="trace-trigger-right">
-                  <span class="trace-hint" id="trace-toggle-hint">Details</span>
-                  <svg class="trace-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M6 9l6 6 6-6" stroke-linecap="round" stroke-linejoin="round"/>
-                  </svg>
-                </div>
-              </button>
-
-              <!-- Expanded Detailed Tool Trace Cards -->
-              <div class="trace-details-panel" id="trace-steps-body"></div>
-            </div>
-
-            <!-- Answer Prose -->
-            <div class="answer-body" id="answer-body"></div>
-
-            <!-- Clickable Source Pills + Telemetry -->
-            <div class="answer-footer" id="answer-footer">
-              <div class="source-pills-row" id="source-pills-row"></div>
-              <div class="meta-line" id="meta-line"></div>
-            </div>
-          </div>
-
-          <!-- Floating Bottom Prompt Card (No scenario pills, no rerun button) -->
+          <!-- Floating Bottom Prompt Card (Follow-up input in active conversation) -->
           <div class="bottom-dock">
             <div class="prompt-card compact">
               <textarea

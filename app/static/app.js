@@ -20,6 +20,7 @@ const state = {
   scenarios: [],
   activeScenarioId: null,
   currentTrace: null,
+  activeTurns: [],        // Array of completed turn traces in the currently open conversation
   timerInterval: null,
   chatHistory: [],        // Session-persisted completed conversations only (never empty chats)
   activeChatId: null,     // null when on empty Home stage
@@ -391,19 +392,24 @@ function resetToHome() {
   state.activeScenarioId = null;
   state.activeChatId = null;
   state.currentTrace = null;
+  state.activeTurns = [];
   if (state.timerInterval) {
     clearInterval(state.timerInterval);
     state.timerInterval = null;
   }
+  const turnsList = document.getElementById('chat-turns-list');
+  if (turnsList) turnsList.innerHTML = '';
   const homeStage = document.getElementById('home-stage');
   if (homeStage) {
     homeStage.classList.remove('is-launching', 'hidden');
   }
-  document.body.classList.remove('is-launching');
+  document.body.classList.remove('is-launching', 'is-thinking');
   document.getElementById('chat-view').classList.add('hidden');
   closeSourcePanel();
   const homeInput = document.getElementById('home-input');
   if (homeInput) homeInput.value = '';
+  const chatInput = document.getElementById('chat-input');
+  if (chatInput) chatInput.value = '';
   updateNewChatButtonState();
   renderHistoryList();
 }
@@ -415,7 +421,12 @@ function loadSessionHistory() {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
         // Filter strictly to valid conversations that actually have a question & answer
-        state.chatHistory = parsed.filter((item) => item && item.question && item.trace && item.trace.answer);
+        state.chatHistory = parsed
+          .filter((item) => item && item.question && item.trace && item.trace.answer)
+          .map((item) => ({
+            ...item,
+            turns: Array.isArray(item.turns) && item.turns.length > 0 ? item.turns : [item.trace],
+          }));
       }
     }
   } catch (e) {
@@ -433,20 +444,48 @@ function saveSessionHistory() {
   renderHistoryList();
 }
 
-function recordCompletedConversation(traceData) {
+function recordCompletedConversation(traceData, { isFollowUp = false } = {}) {
   if (!traceData || !traceData.question || !traceData.answer) return;
 
   const now = new Date();
   const timeStr = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-  const chatId = `chat_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
+  // If this is a follow-up in an existing active conversation, append the turn to the SAME conversation!
+  if (isFollowUp && state.activeChatId) {
+    const existingIdx = state.chatHistory.findIndex((c) => c.id === state.activeChatId);
+    if (existingIdx !== -1) {
+      const existing = state.chatHistory[existingIdx];
+      const prevTurns =
+        Array.isArray(existing.turns) && existing.turns.length > 0
+          ? existing.turns
+          : existing.trace
+          ? [existing.trace]
+          : [];
+      const updated = {
+        ...existing,
+        mode: traceData.mode || state.mode,
+        model: state.selectedModel || existing.model || 'gemma4:e4b-it-qat',
+        time: timeStr,
+        trace: traceData,
+        turns: [...prevTurns, traceData],
+      };
+      state.chatHistory.splice(existingIdx, 1);
+      state.chatHistory.unshift(updated);
+      updateNewChatButtonState();
+      saveSessionHistory();
+      return;
+    }
+  }
+
+  const chatId = `chat_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
   const entry = {
     id: chatId,
     question: traceData.question,
     mode: traceData.mode || state.mode,
-    model: state.selectedModel || 'gemma4:12b',
+    model: state.selectedModel || 'gemma4:e4b-it-qat',
     time: timeStr,
     trace: traceData,
+    turns: [traceData],
   };
 
   // Prepend most recent conversation at top of session history (cap at 25 per session)
@@ -495,6 +534,8 @@ function renderHistoryList() {
       const isActive = item.id === state.activeChatId;
       const shortModel = formatModelLabel(item.model || '');
       const modeLabel = (item.mode || 'agent').toUpperCase();
+      const turnCount = Array.isArray(item.turns) ? item.turns.length : 1;
+      const turnsBadge = turnCount > 1 ? `<span>· ${turnCount} msg</span>` : '';
       return `
         <div class="history-item${isActive ? ' active' : ''}" onclick="openHistoryChat('${escapeHtml(item.id)}')">
           <div class="history-item-main">
@@ -502,6 +543,7 @@ function renderHistoryList() {
             <div class="history-item-meta">
               <span class="history-mode-badge">${escapeHtml(modeLabel)}</span>
               <span>${escapeHtml(shortModel)}</span>
+              ${turnsBadge}
               <span>· ${escapeHtml(item.time || '')}</span>
             </div>
           </div>
@@ -516,8 +558,10 @@ function openHistoryChat(chatId) {
   const item = state.chatHistory.find((c) => c.id === chatId);
   if (!item || !item.trace) return;
 
+  const turns = Array.isArray(item.turns) && item.turns.length > 0 ? item.turns : [item.trace];
   state.activeChatId = item.id;
-  state.currentTrace = item.trace;
+  state.activeTurns = [...turns];
+  state.currentTrace = turns[turns.length - 1];
   setMode(item.mode || 'agent');
 
   const histPop = document.getElementById('history-popover');
@@ -526,9 +570,17 @@ function openHistoryChat(chatId) {
   document.getElementById('home-stage').classList.add('hidden');
   document.getElementById('chat-view').classList.remove('hidden');
 
+  const turnsList = document.getElementById('chat-turns-list');
+  if (turnsList) {
+    turnsList.innerHTML = '';
+    turns.forEach((turnData, idx) => {
+      appendTurnElement(idx, turnData.question || '');
+      renderConversationTurn(turnData, idx, { autoOpenPanel: idx === turns.length - 1 });
+    });
+  }
+
   updateNewChatButtonState();
   renderHistoryList();
-  renderConversationTurn(item.trace);
 }
 
 function deleteHistoryChat(event, chatId) {
@@ -572,9 +624,9 @@ function setMode(mode) {
   }
 }
 
-function toggleTraceSteps() {
-  const drawer = document.getElementById('trace-accordion');
-  const hint = document.getElementById('trace-toggle-hint');
+function toggleTraceSteps(turnIdx = 0) {
+  const drawer = document.getElementById(`trace-accordion-${turnIdx}`);
+  const hint = document.getElementById(`trace-toggle-hint-${turnIdx}`);
   if (!drawer) return;
   const isCollapsed = drawer.classList.toggle('collapsed');
   if (hint) {
@@ -587,45 +639,104 @@ function autoGrow(el) {
   el.style.height = Math.min(el.scrollHeight, 100) + 'px';
 }
 
+function appendTurnElement(turnIdx, questionText) {
+  const turnsList = document.getElementById('chat-turns-list');
+  if (!turnsList) return null;
+
+  const existing = document.getElementById(`chat-turn-${turnIdx}`);
+  if (existing) existing.remove();
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'chat-turn';
+  wrapper.id = `chat-turn-${turnIdx}`;
+  wrapper.dataset.turnIndex = String(turnIdx);
+  wrapper.innerHTML = `
+    <div class="user-row">
+      <div class="user-pill" id="user-question-text-${turnIdx}">${escapeHtml(questionText)}</div>
+    </div>
+
+    <div class="assistant-card">
+      <div class="trace-drawer collapsed" id="trace-accordion-${turnIdx}">
+        <button class="trace-pill-trigger" onclick="toggleTraceSteps(${turnIdx})" title="Click to inspect tool calls and arguments">
+          <div class="trace-trigger-left">
+            <span class="trace-dot" id="trace-dot-${turnIdx}"></span>
+            <span class="trace-label" id="trace-summary-text-${turnIdx}">Reasoning &amp; tools</span>
+            <div class="trace-chips" id="trace-chips-${turnIdx}"></div>
+          </div>
+          <div class="trace-trigger-right">
+            <span class="trace-hint" id="trace-toggle-hint-${turnIdx}">Details</span>
+            <svg class="trace-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M6 9l6 6 6-6" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+        </button>
+
+        <div class="trace-details-panel" id="trace-steps-body-${turnIdx}"></div>
+      </div>
+
+      <div class="answer-body" id="answer-body-${turnIdx}"></div>
+
+      <div class="answer-footer" id="answer-footer-${turnIdx}">
+        <div class="source-pills-row" id="source-pills-row-${turnIdx}"></div>
+        <div class="meta-line" id="meta-line-${turnIdx}"></div>
+      </div>
+    </div>
+  `;
+  turnsList.appendChild(wrapper);
+  return wrapper;
+}
+
 // ============================================================================
-// 100% Live Query Execution on Ollama / OpenRouter
+// 100% Live Query Execution on Ollama / OpenRouter / Anthropic (Multi-Turn)
 // ============================================================================
 async function selectScenario(scenarioId) {
+  if (document.body.classList.contains('is-thinking')) return;
   const sc = state.scenarios.find((s) => s.id === scenarioId);
   if (!sc) return;
   state.activeScenarioId = scenarioId;
   setMode(sc.mode || 'agent');
-  // Always execute live
-  await executeQuery({ question: sc.question, mode: state.mode });
+  // Starting from Home starts a fresh conversation thread
+  await executeQuery({ question: sc.question, mode: state.mode, isFollowUp: false });
 }
 
 async function submitFromHome() {
+  if (document.body.classList.contains('is-thinking')) return;
   const input = document.getElementById('home-input');
   const q = (input.value || '').trim();
   if (!q) return;
   input.value = '';
   state.activeScenarioId = null;
-  await executeQuery({ question: q, mode: state.mode });
+  await executeQuery({ question: q, mode: state.mode, isFollowUp: false });
 }
 
 async function submitFromChat() {
+  if (document.body.classList.contains('is-thinking')) return;
   const input = document.getElementById('chat-input');
   const q = (input.value || '').trim();
   if (!q) return;
   input.value = '';
   input.style.height = 'auto';
   state.activeScenarioId = null;
-  await executeQuery({ question: q, mode: state.mode });
+  // Submitting from #chat-input continues the current conversation as a true follow-up turn!
+  await executeQuery({ question: q, mode: state.mode, isFollowUp: true });
 }
 
 async function executeQuery(payload) {
   const qText = payload.question || '';
+  const isFollowUp = Boolean(payload.isFollowUp && state.activeTurns.length > 0);
   const homeStage = document.getElementById('home-stage');
   const chatView = document.getElementById('chat-view');
-  closeSourcePanel();
+  const turnsList = document.getElementById('chat-turns-list');
+
+  if (!isFollowUp) {
+    state.activeTurns = [];
+    state.activeChatId = null;
+    if (turnsList) turnsList.innerHTML = '';
+    closeSourcePanel();
+  }
 
   // Trigger the home title & blue aura launch animation if starting from the home screen
-  if (homeStage && !homeStage.classList.contains('hidden')) {
+  if (!isFollowUp && homeStage && !homeStage.classList.contains('hidden')) {
     homeStage.classList.add('is-launching');
     document.body.classList.add('is-launching');
     setTimeout(() => {
@@ -637,16 +748,23 @@ async function executeQuery(payload) {
   }
   if (chatView) chatView.classList.remove('hidden');
 
-  document.getElementById('user-question-text').textContent = qText;
-  const drawer = document.getElementById('trace-accordion');
-  const dot = document.getElementById('trace-dot');
-  const summaryText = document.getElementById('trace-summary-text');
-  const chipsEl = document.getElementById('trace-chips');
-  const stepsEl = document.getElementById('trace-steps-body');
-  const hintEl = document.getElementById('trace-toggle-hint');
-  const answerEl = document.getElementById('answer-body');
-  const sourcesEl = document.getElementById('source-pills-row');
-  const metaEl = document.getElementById('meta-line');
+  const turnIdx = state.activeTurns.length;
+  const turnWrapper = appendTurnElement(turnIdx, qText);
+  if (isFollowUp && turnWrapper) {
+    setTimeout(() => {
+      turnWrapper.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }, 40);
+  }
+
+  const drawer = document.getElementById(`trace-accordion-${turnIdx}`);
+  const dot = document.getElementById(`trace-dot-${turnIdx}`);
+  const summaryText = document.getElementById(`trace-summary-text-${turnIdx}`);
+  const chipsEl = document.getElementById(`trace-chips-${turnIdx}`);
+  const stepsEl = document.getElementById(`trace-steps-body-${turnIdx}`);
+  const hintEl = document.getElementById(`trace-toggle-hint-${turnIdx}`);
+  const answerEl = document.getElementById(`answer-body-${turnIdx}`);
+  const sourcesEl = document.getElementById(`source-pills-row-${turnIdx}`);
+  const metaEl = document.getElementById(`meta-line-${turnIdx}`);
 
   // Always start discreet (collapsed)
   if (drawer) drawer.classList.add('collapsed');
@@ -657,11 +775,27 @@ async function executeQuery(payload) {
   const startTs = performance.now();
   const modelLabel = formatModelLabel(state.selectedModel || 'gemma4:12b');
 
+  // Build conversation history payload for follow-up context resolution on the backend
+  const historyPayload = isFollowUp
+    ? state.activeTurns.map((t) => ({
+        question: t.question,
+        answer: t.answer,
+        citations: t.citations || [],
+        cited_nums: (t.sources || []).filter((s) => s.is_cited).map((s) => s.num),
+        citable: Object.fromEntries((t.sources || []).map((s) => [s.num, s.doc_id])),
+        tool_calls: (t.tool_calls || []).map((tc) => ({
+          name: tc.name,
+          arguments: tc.arguments,
+        })),
+      }))
+    : [];
+
   // Live state tracked during streaming
   const liveTimeline = [];
   const completedToolChips = [];
   let activeToolName = null;
   let liveToolStepCount = 0;
+  const timerChipId = `live-timer-chip-${turnIdx}`;
 
   function renderLiveProgress() {
     const elapsed = ((performance.now() - startTs) / 1000).toFixed(1);
@@ -671,7 +805,7 @@ async function executeQuery(payload) {
     const doneChipsHtml = completedToolChips
       .map((t) => `<span class="trace-chip verified">${escapeHtml(t)} ✓</span>`)
       .join('');
-    chipsEl.innerHTML = `${doneChipsHtml}${activeChipHtml}<span class="trace-chip" id="live-timer-chip">${elapsed}s</span>`;
+    chipsEl.innerHTML = `${doneChipsHtml}${activeChipHtml}<span class="trace-chip" id="${timerChipId}">${elapsed}s</span>`;
 
     answerEl.innerHTML = `
       <div class="live-activity-box">
@@ -708,7 +842,9 @@ async function executeQuery(payload) {
     id: 'init',
     status: 'running',
     title: `Démarrage (${modelLabel})`,
-    detail: 'Préparation du contexte juridique…',
+    detail: isFollowUp
+      ? `Reprise du contexte (${state.activeTurns.length} échange${state.activeTurns.length > 1 ? 's' : ''} précédent${state.activeTurns.length > 1 ? 's' : ''})…`
+      : 'Préparation du contexte juridique…',
   });
   stepsEl.innerHTML = '';
   sourcesEl.innerHTML = '';
@@ -718,7 +854,7 @@ async function executeQuery(payload) {
   if (state.timerInterval) clearInterval(state.timerInterval);
   state.timerInterval = setInterval(() => {
     const elapsed = ((performance.now() - startTs) / 1000).toFixed(1);
-    const chip = document.getElementById('live-timer-chip');
+    const chip = document.getElementById(timerChipId);
     if (chip) chip.textContent = `${elapsed}s`;
   }, 100);
 
@@ -814,6 +950,7 @@ async function executeQuery(payload) {
         question: qText,
         mode: payload.mode || state.mode,
         model: state.selectedModel,
+        history: historyPayload,
         stream: true,
       }),
     });
@@ -824,9 +961,10 @@ async function executeQuery(payload) {
         answerEl.textContent = `Error: ${data.error}`;
         return;
       }
+      state.activeTurns[turnIdx] = data;
       state.currentTrace = data;
-      recordCompletedConversation(data);
-      renderConversationTurn(data);
+      recordCompletedConversation(data, { isFollowUp });
+      renderConversationTurn(data, turnIdx);
       return;
     }
 
@@ -855,9 +993,15 @@ async function executeQuery(payload) {
           return;
         }
         if (ev.type === 'final' && ev.data) {
+          state.activeTurns[turnIdx] = ev.data;
           state.currentTrace = ev.data;
-          recordCompletedConversation(ev.data);
-          renderConversationTurn(ev.data);
+          recordCompletedConversation(ev.data, { isFollowUp });
+          renderConversationTurn(ev.data, turnIdx);
+          if (isFollowUp && turnWrapper) {
+            setTimeout(() => {
+              turnWrapper.scrollIntoView({ behavior: 'smooth', block: 'end' });
+            }, 60);
+          }
           return;
         }
         handleStreamEvent(ev);
@@ -878,83 +1022,95 @@ async function executeQuery(payload) {
 // ============================================================================
 // Render Conversation Turn, Discreet Tool Trace & Right Source Panel
 // ============================================================================
-function renderConversationTurn(data) {
-  document.getElementById('user-question-text').textContent = data.question;
+function renderConversationTurn(data, turnIdx = 0, { autoOpenPanel = true } = {}) {
+  const qEl = document.getElementById(`user-question-text-${turnIdx}`);
+  if (qEl) qEl.textContent = data.question;
 
   const toolCalls = Array.isArray(data.tool_calls) ? data.tool_calls : [];
   const extCalls = toolCalls.filter((tc) => tc.name && tc.name !== 'final_answer');
 
   // 1. Discreet Summary Pill
-  const summaryEl = document.getElementById('trace-summary-text');
-  if (data.mode === 'rag' && extCalls.length === 0) {
-    summaryEl.textContent = 'Hybrid RAG retrieval';
-  } else if (extCalls.length > 0) {
-    summaryEl.textContent = `${extCalls.length} tool${extCalls.length > 1 ? 's' : ''} called`;
-  } else {
-    summaryEl.textContent = 'Scope guardrail';
+  const summaryEl = document.getElementById(`trace-summary-text-${turnIdx}`);
+  if (summaryEl) {
+    if (data.mode === 'rag' && extCalls.length === 0) {
+      summaryEl.textContent = 'Hybrid RAG retrieval';
+    } else if (extCalls.length > 0) {
+      summaryEl.textContent = `${extCalls.length} tool${extCalls.length > 1 ? 's' : ''} called`;
+    } else {
+      summaryEl.textContent = 'Scope guardrail';
+    }
   }
 
   const uniqueTools = [...new Set(extCalls.map((t) => t.name))];
   const chipsHtml = uniqueTools
     .map((t) => `<span class="trace-chip">${escapeHtml(t)}</span>`)
     .join('');
-  document.getElementById('trace-chips').innerHTML =
-    chipsHtml + `<span class="trace-chip verified">check_final ✓</span>`;
+  const chipsEl = document.getElementById(`trace-chips-${turnIdx}`);
+  if (chipsEl) {
+    chipsEl.innerHTML = chipsHtml + `<span class="trace-chip verified">check_final ✓</span>`;
+  }
 
   // 2. Detailed Tool Step Cards (Visible when user clicks the trace pill during demo)
-  const stepsEl = document.getElementById('trace-steps-body');
-  if (toolCalls.length > 0) {
-    stepsEl.innerHTML = toolCalls.map((tc, idx) => renderToolStepCard(tc, idx + 1)).join('');
-  } else {
-    // Single-pass RAG mode trace card
-    const retrievedCount = (data.retrieved_ids || []).length;
-    stepsEl.innerHTML = `
-      <div class="trace-step-card">
-        <div class="trace-step-top">
-          <div class="trace-step-title">
-            <span class="trace-step-num">RAG</span>
-            <span class="trace-step-fn">search(BM25 + bge-m3 + RRF + bge-reranker-v2-m3)</span>
+  const stepsEl = document.getElementById(`trace-steps-body-${turnIdx}`);
+  if (stepsEl) {
+    if (toolCalls.length > 0) {
+      stepsEl.innerHTML = toolCalls.map((tc, idx) => renderToolStepCard(tc, idx + 1)).join('');
+    } else {
+      // Single-pass RAG mode trace card
+      const retrievedCount = (data.retrieved_ids || []).length;
+      stepsEl.innerHTML = `
+        <div class="trace-step-card">
+          <div class="trace-step-top">
+            <div class="trace-step-title">
+              <span class="trace-step-num">RAG</span>
+              <span class="trace-step-fn">search(BM25 + bge-m3 + RRF + bge-reranker-v2-m3)</span>
+            </div>
+            <span class="trace-step-latency">${retrievedCount} chunks</span>
           </div>
-          <span class="trace-step-latency">${retrievedCount} chunks</span>
+          <div class="trace-step-obs">Retrieved ${retrievedCount} VIGUEUR articles → Constrained RagAnswer JSON → check_final() verified</div>
         </div>
-        <div class="trace-step-obs">Retrieved ${retrievedCount} VIGUEUR articles → Constrained RagAnswer JSON → check_final() verified</div>
-      </div>
-    `;
+      `;
+    }
   }
 
   // 3. Answer body with clickable citation pills
-  document.getElementById('answer-body').innerHTML = decorateCitations(data.answer || '');
+  const answerEl = document.getElementById(`answer-body-${turnIdx}`);
+  if (answerEl) {
+    answerEl.innerHTML = decorateCitations(data.answer || '', turnIdx);
+  }
 
   // 4. Source pills
   const sources = Array.isArray(data.sources) ? data.sources : [];
   const cited = sources.filter((s) => s.is_cited);
   const displaySources = cited.length > 0 ? cited : sources;
-  const pillsRow = document.getElementById('source-pills-row');
+  const pillsRow = document.getElementById(`source-pills-row-${turnIdx}`);
 
-  if (displaySources.length > 0) {
-    pillsRow.innerHTML = displaySources
-      .map(
-        (s) => `
-        <button class="src-pill" data-doc-id="${escapeHtml(s.doc_id)}" onclick="openSourcePanel('${escapeHtml(s.doc_id)}')">
-          <span class="src-dot"></span>
-          <span>Art. ${escapeHtml(s.num)}</span>
-        </button>
-      `
-      )
-      .join('');
-  } else {
-    const histCall = extCalls.find((tc) => tc.name === 'get_article_at_date');
-    if (histCall && histCall.arguments && histCall.arguments.num) {
-      const num = histCall.arguments.num;
-      const dateStr = histCall.arguments.date || '2019-06-15';
-      pillsRow.innerHTML = `
-        <button class="src-pill" onclick="openGapPanel('${escapeHtml(num)}', '${escapeHtml(dateStr)}')">
-          <span class="src-dot" style="background:var(--red)"></span>
-          <span>Timeline ${escapeHtml(num)} (${escapeHtml(dateStr)})</span>
-        </button>
-      `;
+  if (pillsRow) {
+    if (displaySources.length > 0) {
+      pillsRow.innerHTML = displaySources
+        .map(
+          (s) => `
+          <button class="src-pill" data-doc-id="${escapeHtml(s.doc_id)}" onclick="openSourcePanel('${escapeHtml(s.doc_id)}', ${turnIdx})">
+            <span class="src-dot"></span>
+            <span>Art. ${escapeHtml(s.num)}</span>
+          </button>
+        `
+        )
+        .join('');
     } else {
-      pillsRow.innerHTML = '';
+      const histCall = extCalls.find((tc) => tc.name === 'get_article_at_date');
+      if (histCall && histCall.arguments && histCall.arguments.num) {
+        const num = histCall.arguments.num;
+        const dateStr = histCall.arguments.date || '2019-06-15';
+        pillsRow.innerHTML = `
+          <button class="src-pill" onclick="openGapPanel('${escapeHtml(num)}', '${escapeHtml(dateStr)}')">
+            <span class="src-dot" style="background:var(--red)"></span>
+            <span>Timeline ${escapeHtml(num)} (${escapeHtml(dateStr)})</span>
+          </button>
+        `;
+      } else {
+        pillsRow.innerHTML = '';
+      }
     }
   }
 
@@ -966,20 +1122,25 @@ function renderConversationTurn(data) {
   const rawCost = Number(data.cost_eur || 0);
   const costSuffix = rawCost > 0 ? ` · €${rawCost.toFixed(4)}` : '';
 
-  document.getElementById('meta-line').textContent =
-    cCount > 0
-      ? `${cCount}/${cCount} verified · ${secs}s · ${tokIn + tokOut} tok${costSuffix}`
-      : `stop='${data.stop_reason || 'answered'}' · ${secs}s${costSuffix}`;
+  const metaEl = document.getElementById(`meta-line-${turnIdx}`);
+  if (metaEl) {
+    metaEl.textContent =
+      cCount > 0
+        ? `${cCount}/${cCount} verified · ${secs}s · ${tokIn + tokOut} tok${costSuffix}`
+        : `stop='${data.stop_reason || 'answered'}' · ${secs}s${costSuffix}`;
+  }
 
-  // 6. Auto-open right panel for visual impact
-  if (displaySources.length > 0) {
-    openSourcePanel(displaySources[0].doc_id);
-  } else {
-    const histCall = extCalls.find((tc) => tc.name === 'get_article_at_date');
-    if (histCall && histCall.arguments && histCall.arguments.num) {
-      openGapPanel(histCall.arguments.num, histCall.arguments.date || '2019-06-15');
+  // 6. Auto-open right panel for visual impact on the latest turn
+  if (autoOpenPanel) {
+    if (displaySources.length > 0) {
+      openSourcePanel(displaySources[0].doc_id, turnIdx);
     } else {
-      closeSourcePanel();
+      const histCall = extCalls.find((tc) => tc.name === 'get_article_at_date');
+      if (histCall && histCall.arguments && histCall.arguments.num) {
+        openGapPanel(histCall.arguments.num, histCall.arguments.date || '2019-06-15');
+      } else if (turnIdx === 0) {
+        closeSourcePanel();
+      }
     }
   }
 }
@@ -1038,7 +1199,7 @@ function renderToolStepCard(tc, index) {
   `;
 }
 
-function decorateCitations(text) {
+function decorateCitations(text, turnIdx = 0) {
   const raw = String(text || '').trim();
   if (!raw) return '';
   // Split into sentences for a smooth staggered reveal
@@ -1048,15 +1209,36 @@ function decorateCitations(text) {
       const escaped = escapeHtml(sentence);
       const withCites = escaped.replace(/\[([LRD]\.?\s*\d[\w-]*)\]/gi, (match, rawNum) => {
         const cleanNum = rawNum.replace(/\s+/g, '').replace(/\./g, '').toUpperCase();
-        return `<button class="cite-btn" style="animation-delay:${idx * 70 + 120}ms" onclick="openSourceByNum('${cleanNum}')" onmouseenter="highlightSourceByNum('${cleanNum}', true)" onmouseleave="highlightSourceByNum('${cleanNum}', false)">${cleanNum}</button>`;
+        return `<button class="cite-btn" style="animation-delay:${idx * 70 + 120}ms" onclick="openSourceByNum('${cleanNum}', ${turnIdx})" onmouseenter="highlightSourceByNum('${cleanNum}', true, ${turnIdx})" onmouseleave="highlightSourceByNum('${cleanNum}', false, ${turnIdx})">${cleanNum}</button>`;
       });
       return `<span class="sentence-chunk" style="animation-delay:${idx * 70}ms">${withCites}</span>`;
     })
     .join(' ');
 }
 
-function highlightSourceByNum(num, active) {
-  const sources = (state.currentTrace && state.currentTrace.sources) || [];
+function _resolveSourcesForTurn(turnIdx) {
+  const turnTrace =
+    turnIdx != null && state.activeTurns[turnIdx] ? state.activeTurns[turnIdx] : state.currentTrace;
+  const turnSources = (turnTrace && Array.isArray(turnTrace.sources) && turnTrace.sources) || [];
+  // Merge any sources from earlier turns as fallback in case a follow-up cites an earlier turn's article
+  const seenIds = new Set(turnSources.map((s) => s.doc_id));
+  const extraSources = [];
+  for (const t of state.activeTurns) {
+    for (const s of (t && t.sources) || []) {
+      if (s && s.doc_id && !seenIds.has(s.doc_id)) {
+        seenIds.add(s.doc_id);
+        extraSources.push(s);
+      }
+    }
+  }
+  return {
+    turnTrace: turnTrace || state.currentTrace,
+    sources: [...turnSources, ...extraSources],
+  };
+}
+
+function highlightSourceByNum(num, active, turnIdx = null) {
+  const { sources } = _resolveSourcesForTurn(turnIdx);
   const match = sources.find((s) => s.num.toUpperCase() === num.toUpperCase());
   if (!match) return;
   document.querySelectorAll('.src-pill').forEach((p) => {
@@ -1070,17 +1252,18 @@ function highlightSourceByNum(num, active) {
   }
 }
 
-function openSourceByNum(num) {
-  const sources = (state.currentTrace && state.currentTrace.sources) || [];
+function openSourceByNum(num, turnIdx = null) {
+  const { sources } = _resolveSourcesForTurn(turnIdx);
   const match = sources.find((s) => s.num.toUpperCase() === num.toUpperCase());
-  if (match) openSourcePanel(match.doc_id);
+  if (match) openSourcePanel(match.doc_id, turnIdx);
 }
 
 // ============================================================================
 // Right-Side Légifrance Source Inspector Card (Structured Legal Formatting)
 // ============================================================================
-async function openSourcePanel(docId) {
-  const sources = (state.currentTrace && state.currentTrace.sources) || [];
+async function openSourcePanel(docId, turnIdx = null) {
+  const { turnTrace, sources } = _resolveSourcesForTurn(turnIdx);
+  if (turnTrace) state.currentTrace = turnTrace;
   const cited = sources.filter((s) => s.is_cited);
   const tabList = cited.length > 0 ? cited : sources;
   const target = sources.find((s) => s.doc_id === docId) || tabList[0];
@@ -1094,13 +1277,14 @@ async function openSourcePanel(docId) {
   panel.classList.remove('hidden');
   document.getElementById('panel-title').textContent = `Article ${target.num}`;
 
+  const turnArg = turnIdx != null ? `, ${turnIdx}` : '';
   const tabsEl = document.getElementById('panel-tabs');
   tabsEl.innerHTML =
     tabList.length > 1
       ? tabList
           .map(
             (s) => `
-          <button class="panel-tab ${s.doc_id === target.doc_id ? 'active' : ''}" onclick="openSourcePanel('${escapeHtml(s.doc_id)}')">
+          <button class="panel-tab ${s.doc_id === target.doc_id ? 'active' : ''}" onclick="openSourcePanel('${escapeHtml(s.doc_id)}'${turnArg})">
             Art. ${escapeHtml(s.num)}
           </button>
         `

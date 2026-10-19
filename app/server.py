@@ -41,6 +41,7 @@ from app.api_llm import (
     install_llm_bridge,
     is_api_model,
     save_api_key_to_dotenv,
+    set_conversation_history,
     set_live_event_callback,
 )
 from src.agent import llm
@@ -899,6 +900,9 @@ class AlterEgoRequestHandler(SimpleHTTPRequestHandler):
             self._send_json({"error": "Question cannot be empty."}, status=HTTPStatus.BAD_REQUEST)
             return
 
+        raw_history = body.get("history")
+        history = [h for h in raw_history if isinstance(h, dict)] if isinstance(raw_history, list) else []
+
         if body.get("stream"):
             self.send_response(HTTPStatus.OK)
             self.send_header("Content-Type", "application/x-ndjson; charset=utf-8")
@@ -917,10 +921,12 @@ class AlterEgoRequestHandler(SimpleHTTPRequestHandler):
             try:
                 with _INFERENCE_LOCK:
                     set_live_event_callback(_emit)
+                    set_conversation_history(history)
                     try:
                         trace: AnswerTrace = answer(question, mode=mode)
                     finally:
                         set_live_event_callback(None)
+                        set_conversation_history(None)
                 payload = enrich_trace_payload(
                     question=question,
                     mode=mode,
@@ -934,7 +940,11 @@ class AlterEgoRequestHandler(SimpleHTTPRequestHandler):
             return
 
         with _INFERENCE_LOCK:
-            trace = answer(question, mode=mode)
+            set_conversation_history(history)
+            try:
+                trace = answer(question, mode=mode)
+            finally:
+                set_conversation_history(None)
         payload = enrich_trace_payload(
             question=question,
             mode=mode,

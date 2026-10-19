@@ -586,6 +586,54 @@ def set_live_event_callback(cb: Callable[[dict[str, Any]], None] | None) -> None
     _EVENT_LOCAL.callback = cb
 
 
+def set_conversation_history(history: list[dict[str, Any]] | None) -> None:
+    """Register prior conversation turns on the current worker thread for follow-up resolution."""
+    _EVENT_LOCAL.history = list(history) if isinstance(history, list) else []
+
+
+def get_conversation_history() -> list[dict[str, Any]]:
+    """Return prior conversation turns active on the current worker thread."""
+    hist = getattr(_EVENT_LOCAL, "history", None)
+    return list(hist) if isinstance(hist, list) else []
+
+
+def _format_history_context(history: list[dict[str, Any]], is_agent: bool) -> str:
+    """Build a structured <conversation_history> block so follow-up questions resolve implicit references."""
+    if not history:
+        return ""
+    lines = ["<conversation_history>"]
+    for idx, turn in enumerate(history[-4:], start=1):
+        if not isinstance(turn, dict):
+            continue
+        q = str(turn.get("question") or "").strip()
+        a = str(turn.get("answer") or "").strip()
+        tcs = turn.get("tool_calls") or []
+        tc_summaries: list[str] = []
+        for tc in tcs:
+            if isinstance(tc, dict) and tc.get("name") and tc.get("name") != "final_answer":
+                tc_summaries.append(f"{tc['name']}({json.dumps(tc.get('arguments') or {}, ensure_ascii=False)})")
+        if q:
+            lines.append(f"Turn {idx} - User: {q}")
+        if tc_summaries:
+            lines.append(f"Turn {idx} - Tools called: {', '.join(tc_summaries)}")
+        if a:
+            lines.append(f"Turn {idx} - Assistant: {a}")
+    lines.append("</conversation_history>")
+    if is_agent:
+        lines.append(
+            "Follow-up instruction: The <question> below is a follow-up in the same conversation. "
+            "Use <conversation_history> to resolve implicit context (such as the apprentice's age, contract year, "
+            "date, or legal topic from previous turns), and ALWAYS call the required tool(s) "
+            "(search_articles, compute_remuneration, or get_article_at_date) for this follow-up before calling final_answer."
+        )
+    else:
+        lines.append(
+            "Follow-up instruction: The <question> below is a follow-up in the same conversation. "
+            "Use <conversation_history> to understand implicit references, and answer ONLY from the numbered <source> tags."
+        )
+    return "\n".join(lines)
+
+
 def emit_live_event(event: dict[str, Any]) -> None:
     """Emit a real-time event if a callback is active on the current thread."""
     cb = getattr(_EVENT_LOCAL, "callback", None)
@@ -622,7 +670,7 @@ def _sanitize_final_answer_args(args: dict[str, Any]) -> dict[str, Any]:
     if isinstance(ans, str) and ans:
         # Replace [compute_remuneration] with [D6222-26]
         ans = re.sub(r"\[\s*compute_remuneration\s*\]", "[D6222-26]", ans, flags=re.IGNORECASE)
-        # Replace [Article D6222-26] or [Art. L6222-35] with [D6222-26] / [L6222-35]
+        # Replace [Article D6222-26] or [Art. L6222-35] with [D6222-35] / [L6222-35]
         ans = re.sub(r"\[\s*(?:article|art\.?)\s+([LRD]\.?\s*\d[\w-]*)\s*\]", r"[\1]", ans, flags=re.IGNORECASE)
         args["answer"] = ans
 
@@ -650,6 +698,35 @@ def unified_chat(messages: Any, tools: Any = None, schema: Any = None, max_token
     """Drop-in replacement for `src.agent.llm.chat` supporting local Ollama, OpenRouter, and Anthropic Direct."""
     model_id = llm.MODEL
     short_model = model_id.split("/")[-1] if "/" in model_id else model_id
+
+    # Inject multi-turn <conversation_history> into the user prompt when answering a follow-up question
+    history = get_conversation_history()
+    if history and isinstance(messages, (list, tuple)):
+        history_block = _format_history_context(history, is_agent=(tools is not None))
+        if history_block:
+            patched_messages: list[Any] = []
+            injected = False
+            for m in messages:
+                role = m.get("role") if isinstance(m, dict) else getattr(m, "role", "")
+                content = m.get("content") if isinstance(m, dict) else getattr(m, "content", "")
+                if (
+                    not injected
+                    and role == "user"
+                    and isinstance(content, str)
+                    and "<question>" in content
+                    and "<conversation_history>" not in content
+                ):
+                    new_content = content.replace("<question>", f"{history_block}\n\n<question>", 1)
+                    if isinstance(m, dict):
+                        m_copy = dict(m)
+                        m_copy["content"] = new_content
+                        patched_messages.append(m_copy)
+                    else:
+                        patched_messages.append({"role": "user", "content": new_content})
+                    injected = True
+                else:
+                    patched_messages.append(m)
+            messages = patched_messages
 
     # Accurate live phase emission before the LLM call begins
     msg_list = list(messages) if isinstance(messages, (list, tuple)) else []
@@ -788,6 +865,17 @@ def install_llm_bridge() -> None:
                     out = dict(out)
                     out["content"] = f'<source article="D6222-26">\n{out["content"]}\n</source>'
             citable_nums = list((out.get("citable") or {}).keys())
+            # Also carry forward citable articles from prior turns in the same conversation
+            history = get_conversation_history()
+            if history and isinstance(out.get("citable"), dict):
+                merged_citable = dict(out["citable"])
+                for turn in history:
+                    if isinstance(turn, dict) and isinstance(turn.get("citable"), dict):
+                        for art_num, doc_id in turn["citable"].items():
+                            if art_num and doc_id and art_num not in merged_citable:
+                                merged_citable[str(art_num)] = str(doc_id)
+                out = dict(out)
+                out["citable"] = merged_citable
             emit_live_event({
                 "type": "tool_done",
                 "name": name,
@@ -806,6 +894,23 @@ def install_llm_bridge() -> None:
         orig_rag_search = rag_mod.search
 
         def wrapped_rag_search(question: str, k: int = 5, filters: Any = None, **kwargs: Any) -> Any:
+            history = get_conversation_history()
+            effective_query = question
+            if history:
+                prev_questions = " ".join(
+                    str(t.get("question") or "").strip()
+                    for t in history[-2:]
+                    if isinstance(t, dict) and t.get("question")
+                ).strip()
+                prev_nums = " ".join(
+                    str(n)
+                    for t in history[-2:]
+                    if isinstance(t, dict)
+                    for n in (t.get("cited_nums") or [])
+                ).strip()
+                if prev_questions:
+                    effective_query = f"{question} {prev_questions} {prev_nums}".strip()
+
             emit_live_event({
                 "type": "tool_start",
                 "name": "search_articles",
@@ -815,9 +920,9 @@ def install_llm_bridge() -> None:
             })
             t0 = time.perf_counter()
             hits = (
-                orig_rag_search(question, k=k, filters=filters, **kwargs)
+                orig_rag_search(effective_query, k=k, filters=filters, **kwargs)
                 if filters is not None
-                else orig_rag_search(question, k=k, **kwargs)
+                else orig_rag_search(effective_query, k=k, **kwargs)
             )
             elapsed_ms = round((time.perf_counter() - t0) * 1000.0, 1)
             nums = [h.metadata.get("num", "") for h in hits if hasattr(h, "metadata")]
