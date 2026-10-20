@@ -83,7 +83,7 @@ GRID_SINCE = dt.date(2019, 1, 1)
 
 # The SMIC amount is NOT in the Code du travail: an external, dated parameter (decree published each year).
 # Monthly gross amount for 35 h/week. Source: service-public.fr / decrees on the SMIC revaluation.
-SMIC_MONTHLY_GROSS = {dt.date(2024, 11, 1): 1801.80, dt.date(2026, 1, 1): 1823.03}
+SMIC_MONTHLY_GROSS = {dt.date(2024, 11, 1): 1801.80, dt.date(2026, 1, 1): 1823.03, dt.date(2026, 6, 1): 1867.02}
 
 
 class RemunerationArgs(BaseModel):
