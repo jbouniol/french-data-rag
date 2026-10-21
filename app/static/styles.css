@@ -96,8 +96,56 @@ body.is-launching .ambient-glow::after {
 }
 
 body.is-thinking .ambient-glow {
-  animation: auraThinking 2.6s ease-in-out infinite alternate;
-  filter: blur(16px) saturate(1.25);
+  animation: auraThinking 2.2s ease-in-out infinite alternate;
+  filter: blur(18px) saturate(1.42);
+  background:
+    radial-gradient(circle 580px at 50% 54%, rgba(99, 102, 241, 0.52) 0%, rgba(168, 85, 247, 0.28) 46%, rgba(250, 251, 253, 0) 76%),
+    radial-gradient(circle 440px at 42% 44%, rgba(59, 130, 246, 0.48) 0%, rgba(250, 251, 253, 0) 70%),
+    radial-gradient(circle 380px at 58% 50%, rgba(139, 92, 246, 0.36) 0%, rgba(250, 251, 253, 0) 68%);
+}
+
+body.is-thinking .ambient-glow::after {
+  opacity: 0.72;
+  transform: scale(1.12);
+  background: radial-gradient(
+    circle 430px at 50% 42%,
+    rgba(99, 102, 241, 0.56) 0%,
+    rgba(168, 85, 247, 0.34) 38%,
+    rgba(26, 115, 232, 0.18) 58%,
+    rgba(250, 251, 253, 0) 76%
+  );
+}
+
+/* Active Tool Execution Shift (Only while a tool is running inside is-thinking) */
+body.is-thinking.aura-tool-active .ambient-glow {
+  filter: blur(20px) saturate(1.58);
+  background:
+    radial-gradient(circle 600px at 50% 52%, rgba(124, 58, 237, 0.54) 0%, rgba(79, 70, 229, 0.34) 46%, rgba(250, 251, 253, 0) 76%),
+    radial-gradient(circle 440px at 45% 44%, rgba(14, 165, 233, 0.46) 0%, rgba(250, 251, 253, 0) 70%);
+}
+
+/* Brief 1.6s Completion Wave right as the model finishes speaking, then returns to calm Sky Blue */
+body.aura-verified-wave .ambient-glow::after {
+  opacity: 0.78;
+  transform: scale(1.22);
+  background: radial-gradient(
+    circle 460px at 50% 45%,
+    rgba(24, 128, 56, 0.44) 0%,
+    rgba(16, 185, 129, 0.28) 40%,
+    rgba(26, 115, 232, 0.14) 64%,
+    rgba(250, 251, 253, 0) 78%
+  );
+}
+
+body.aura-shield-wave .ambient-glow::after {
+  opacity: 0.82;
+  transform: scale(1.22);
+  background: radial-gradient(
+    circle 460px at 50% 45%,
+    rgba(217, 107, 0, 0.46) 0%,
+    rgba(217, 48, 37, 0.26) 42%,
+    rgba(250, 251, 253, 0) 76%
+  );
 }
 
 @keyframes auraBreath {
@@ -1092,12 +1140,14 @@ body.is-thinking .ambient-glow {
   transform: scale(0.95);
 }
 
-/* Centered Segmented Pill ("Agent | RAG") with Spring Sliding Glider */
+/* Centered Segmented Pill ("Agent | RAG") + Matching Duel Pill Below */
 .center-segmented-wrap {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
   margin-top: 16px;
-  margin-bottom: 34px;
+  margin-bottom: 30px;
   animation: springRise 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.1s both;
 }
 
@@ -1163,11 +1213,113 @@ body.is-thinking .ambient-glow {
   border-radius: 999px;
   cursor: pointer;
   text-align: center;
+  white-space: nowrap;
   transition: color 0.2s ease, transform 0.2s ease;
 }
 
 .seg-opt.active {
   color: var(--blue);
+}
+
+/* Matching Glassmorphic Duel Pill Below Agent | RAG */
+.duel-pill-shell {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.58);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  padding: 3px;
+  border-radius: 999px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+  transition: all 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.duel-pill-shell.active {
+  background: rgba(255, 255, 255, 0.78);
+  border-color: rgba(26, 115, 232, 0.24);
+  box-shadow: 0 4px 14px rgba(26, 115, 232, 0.08), 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+.duel-toggle-btn {
+  border: none;
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 5px 18px;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.24s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.duel-toggle-btn:hover:not(.active) {
+  color: var(--text-main);
+}
+
+.duel-toggle-btn.active {
+  background: #FFFFFF;
+  color: var(--blue);
+  box-shadow: 0 2px 8px rgba(26, 115, 232, 0.14), 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.duel-selector-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding-right: 4px;
+  animation: fadeIn 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.duel-vs-sep {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  padding-left: 2px;
+}
+
+.duel-inline-select {
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid rgba(26, 115, 232, 0.18);
+  background: #FFFFFF;
+  color: var(--blue);
+  font-size: 0.74rem;
+  font-weight: 600;
+  padding: 4px 22px 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  outline: none;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.05);
+  transition: width 0.24s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.15s ease, background-color 0.15s ease;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%231A73E8' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 7px center;
+}
+
+.duel-inline-select:hover,
+.duel-inline-select:focus {
+  background-color: var(--blue-pill);
+  border-color: rgba(26, 115, 232, 0.35);
+}
+
+.duel-pill-shell.mini {
+  background: rgba(240, 244, 249, 0.85);
+  border: none;
+  box-shadow: none;
+  padding: 2px;
+}
+
+.duel-pill-shell.mini .duel-toggle-btn {
+  font-size: 0.72rem;
+  padding: 3px 11px;
+}
+
+.duel-pill-shell.mini .duel-inline-select {
+  font-size: 0.7rem;
+  padding: 2px 20px 2px 8px;
 }
 
 /* Borderless Suggestion Rows with Staggered Entrance & Micro-Hover */
@@ -2161,4 +2313,495 @@ body.is-thinking .ambient-glow {
 .panel-link:hover {
   background: var(--blue);
   color: #FFFFFF;
+}
+
+/* ============================================================================
+   Bidirectional Citation Hover-Peek Tooltip & Clause Spotlight
+   ============================================================================ */
+.citation-hover-peek {
+  position: fixed;
+  z-index: 95;
+  width: 340px;
+  max-width: calc(100vw - 24px);
+  background: rgba(15, 23, 42, 0.96);
+  backdrop-filter: blur(16px);
+  color: #F8FAFC;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 14px;
+  padding: 11px 13px;
+  box-shadow: 0 16px 38px rgba(15, 23, 42, 0.28), 0 0 0 1px rgba(26, 115, 232, 0.25);
+  pointer-events: none;
+  animation: citePeekPop 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes citePeekPop {
+  from {
+    opacity: 0;
+    transform: translateY(5px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.cite-peek-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.cite-peek-num {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #93C5FD;
+}
+
+.cite-peek-etat {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.2);
+  color: #6EE7B7;
+}
+
+.cite-peek-docid {
+  font-family: var(--font-mono);
+  font-size: 0.63rem;
+  color: #94A3B8;
+  margin-bottom: 6px;
+}
+
+.cite-peek-excerpt {
+  font-size: 0.76rem;
+  line-height: 1.46;
+  color: #E2E8F0;
+  background: rgba(255, 255, 255, 0.06);
+  border-left: 2.5px solid #3B82F6;
+  padding: 6px 9px;
+  border-radius: 0 8px 8px 0;
+}
+
+.cite-peek-footer {
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 0.63rem;
+  color: #93C5FD;
+}
+
+/* Clause Spotlight inside Right Légifrance Inspector */
+.legal-group-card.clause-spotlight,
+.legal-paragraph-card.clause-spotlight,
+.legal-subclause-row.clause-spotlight {
+  background: #EFF6FF !important;
+  border-color: var(--blue) !important;
+  box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.14), 0 6px 18px rgba(26, 115, 232, 0.1) !important;
+  transform: translateX(2px);
+}
+
+.clause-spotlight-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--blue);
+  background: #DBEAFE;
+  padding: 1px 7px;
+  border-radius: 999px;
+  margin-bottom: 5px;
+}
+
+.cite-btn.bidirectional-active {
+  background: var(--blue);
+  color: #FFFFFF;
+  transform: translateY(-1px) scale(1.08);
+  box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.22), 0 4px 10px rgba(26, 115, 232, 0.28);
+}
+
+/* ============================================================================
+   Interactive D6222-26 SMIC Simulator Widget
+   ============================================================================ */
+.smic-sim-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.smic-sim-title {
+  font-family: var(--font-mono);
+  font-size: 0.67rem;
+  font-weight: 700;
+  color: var(--purple);
+  letter-spacing: 0.02em;
+}
+
+.smic-sim-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.smic-licpro-btn {
+  border: 1px solid rgba(118, 39, 187, 0.25);
+  background: #FFFFFF;
+  color: var(--purple);
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.smic-licpro-btn:hover {
+  border-color: var(--purple);
+  background: var(--purple-pill);
+}
+
+.smic-licpro-btn.active {
+  background: var(--purple);
+  border-color: var(--purple);
+  color: #FFFFFF;
+  box-shadow: 0 2px 6px rgba(118, 39, 187, 0.25);
+}
+
+.smic-date-select {
+  border: 1px solid #DCE3EC;
+  background: #FFFFFF;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  outline: none;
+}
+
+.smic-result-banner {
+  background: linear-gradient(135deg, #7627BB 0%, #4F46E5 100%);
+  color: #FFFFFF;
+  border-radius: 10px;
+  padding: 8px 11px;
+  margin-bottom: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  box-shadow: 0 4px 12px rgba(118, 39, 187, 0.18);
+}
+
+.smic-result-left {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.smic-result-sub {
+  font-size: 0.67rem;
+  opacity: 0.9;
+  font-weight: 500;
+}
+
+.smic-result-main {
+  font-family: var(--font-mono);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.smic-result-ref {
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  background: rgba(255, 255, 255, 0.18);
+  padding: 2px 7px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.smic-mini-grid td.clickable-cell {
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background-color 0.14s ease, color 0.14s ease, transform 0.14s ease;
+}
+
+.smic-mini-grid td.clickable-cell:hover:not(.active-cell) {
+  background: rgba(118, 39, 187, 0.09);
+  color: var(--purple);
+  font-weight: 600;
+}
+
+.smic-mini-grid td.active-cell {
+  background: var(--purple);
+  color: #FFFFFF;
+  font-weight: 700;
+  border-radius: 6px;
+  box-shadow: 0 2px 6px rgba(118, 39, 187, 0.28);
+}
+
+.smic-sim-hint {
+  margin-top: 6px;
+  font-size: 0.66rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* ============================================================================
+   Dedicated Guardrail & Anti-Injection Shield Card
+   ============================================================================ */
+.guardrail-shield-card {
+  background: linear-gradient(180deg, #FFFDF7 0%, #FEF9EC 100%);
+  border: 1.5px solid #F59E0B;
+  border-radius: 16px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 6px 20px rgba(217, 107, 0, 0.08);
+  animation: springRise 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.guardrail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.guardrail-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #92400E;
+  background: #FDE68A;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+
+.guardrail-stop-chip {
+  font-family: var(--font-mono);
+  font-size: 0.67rem;
+  font-weight: 600;
+  color: #B45309;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.guardrail-body {
+  font-size: 0.94rem;
+  line-height: 1.65;
+  color: #451A03;
+}
+
+.guardrail-checks-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(217, 107, 0, 0.24);
+}
+
+.guardrail-check-pill {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.guardrail-check-pill.blocked {
+  background: #FFFFFF;
+  border: 1px solid #FCD34D;
+  color: #92400E;
+}
+
+.guardrail-check-pill.safe {
+  background: var(--green-pill);
+  border: 1px solid rgba(24, 128, 56, 0.25);
+  color: var(--green);
+}
+
+/* ============================================================================
+   Split-Screen Duel Mode (Agent vs RAG / Local vs Cloud)
+   ============================================================================ */
+body.has-duel-turn .main-column {
+  max-width: 980px;
+  transition: max-width 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.duel-turn-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  align-items: stretch;
+}
+
+@media (max-width: 860px) {
+  .duel-turn-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.duel-contestant-card {
+  position: relative;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(14px);
+  border: 1.5px solid rgba(226, 232, 240, 0.92);
+  box-shadow: 0 10px 30px rgba(26, 115, 232, 0.06), 0 2px 8px rgba(15, 23, 42, 0.03);
+  border-radius: 22px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: border-color 0.22s ease, box-shadow 0.22s ease, background 0.22s ease;
+}
+
+.duel-contestant-card.contestant-a {
+  background:
+    radial-gradient(95% 110px at 50% 0%, rgba(26, 115, 232, 0.14) 0%, rgba(26, 115, 232, 0.04) 58%, rgba(255, 255, 255, 0) 100%),
+    linear-gradient(180deg, rgba(232, 240, 254, 0.5) 0%, rgba(255, 255, 255, 0.95) 76px, rgba(255, 255, 255, 0.96) 100%);
+  border-color: rgba(26, 115, 232, 0.18);
+}
+
+.duel-contestant-card.contestant-b {
+  background:
+    radial-gradient(95% 110px at 50% 0%, rgba(118, 39, 187, 0.14) 0%, rgba(118, 39, 187, 0.04) 58%, rgba(255, 255, 255, 0) 100%),
+    linear-gradient(180deg, rgba(243, 232, 253, 0.5) 0%, rgba(255, 255, 255, 0.95) 76px, rgba(255, 255, 255, 0.96) 100%);
+  border-color: rgba(118, 39, 187, 0.18);
+}
+
+.duel-card-header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 11px;
+  padding-bottom: 9px;
+}
+
+.duel-card-header::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(148, 163, 184, 0.26) 0%, rgba(226, 232, 240, 0.45) 55%, rgba(226, 232, 240, 0) 100%);
+}
+
+.duel-contestant-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+
+.duel-contestant-badge.badge-a {
+  background: var(--blue-pill);
+  color: var(--blue);
+}
+
+.duel-contestant-badge.badge-b {
+  background: var(--purple-pill);
+  color: var(--purple);
+}
+
+.duel-model-sublabel {
+  font-family: var(--font-mono);
+  font-size: 0.67rem;
+  color: var(--text-muted);
+}
+
+.duel-comparison-banner {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(26, 115, 232, 0.22);
+  border-radius: 16px;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  box-shadow: 0 4px 16px rgba(26, 115, 232, 0.06);
+  animation: fadeIn 0.28s ease both;
+}
+
+.duel-banner-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.71rem;
+  font-weight: 700;
+  color: var(--blue);
+}
+
+.duel-metrics-pills {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.duel-metric-pill {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  background: #F4F7FB;
+  border: 1px solid #E2E8F0;
+  color: var(--text-secondary);
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+
+.duel-metric-pill strong {
+  color: var(--text-main);
+}
+
+.duel-quick-btn {
+  border: 1px solid rgba(26, 115, 232, 0.22);
+  background: #F8FAFD;
+  color: var(--blue);
+  font-family: var(--font-mono);
+  font-size: 0.67rem;
+  font-weight: 600;
+  padding: 2px 9px;
+  border-radius: 999px;
+  cursor: pointer;
+  margin-left: 6px;
+  transition: all 0.16s ease;
+}
+
+.duel-quick-btn:hover {
+  background: var(--blue);
+  color: #FFFFFF;
+  border-color: var(--blue);
+  transform: translateY(-1px);
 }

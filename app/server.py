@@ -781,6 +781,10 @@ class AlterEgoRequestHandler(SimpleHTTPRequestHandler):
         # Keep console logs clean during live demos
         pass
 
+    def end_headers(self) -> None:
+        self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+        super().end_headers()
+
     def _send_json(self, payload: Any, status: int = HTTPStatus.OK) -> None:
         raw = json.dumps(payload, ensure_ascii=False, default=str).encode("utf-8")
         self.send_response(status)

@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/styles.css?v=6" />
 </head>
 <body>
   <!-- Ethereal Radial Blue Glow Background -->
@@ -162,11 +162,24 @@
             </div>
           </div>
 
-          <!-- Centered Segmented Toggle ("Agent | RAG") -->
+          <!-- Centered Segmented Toggle ("Agent | RAG") + Matching Duel Pill Below -->
           <div class="center-segmented-wrap">
             <div class="segmented-pill">
               <button class="seg-opt active" id="seg-agent" onclick="setMode('agent')">Agent</button>
               <button class="seg-opt" id="seg-rag" onclick="setMode('rag')">RAG</button>
+            </div>
+
+            <!-- Duel Pill Below in the Same Glassmorphic Style, Expanding Selector on Select -->
+            <div class="duel-pill-shell" id="home-duel-shell">
+              <button type="button" class="duel-toggle-btn" id="home-duel-btn" onclick="toggleDuelMode()">
+                ⚔ Duel
+              </button>
+              <div class="duel-selector-wrap hidden" id="home-duel-selector-wrap">
+                <span class="duel-vs-sep mono">vs</span>
+                <select id="home-duel-model-select" class="duel-inline-select mono" onchange="selectDuelChallengerModel(this.value)" title="Sélectionner l'adversaire du Duel">
+                  <option value="">Challenger…</option>
+                </select>
+              </div>
             </div>
           </div>
 
@@ -205,6 +218,17 @@
                     <button class="seg-opt active" id="chat-seg-agent" onclick="setMode('agent')">Agent</button>
                     <button class="seg-opt" id="chat-seg-rag" onclick="setMode('rag')">RAG</button>
                   </div>
+                  <div class="duel-pill-shell mini" id="chat-duel-shell">
+                    <button type="button" class="duel-toggle-btn" id="chat-duel-btn" onclick="toggleDuelMode()">
+                      ⚔ Duel
+                    </button>
+                    <div class="duel-selector-wrap hidden" id="chat-duel-selector-wrap">
+                      <span class="duel-vs-sep mono">vs</span>
+                      <select id="chat-duel-model-select" class="duel-inline-select mono" onchange="selectDuelChallengerModel(this.value)" title="Sélectionner l'adversaire du Duel">
+                        <option value="">Challenger…</option>
+                      </select>
+                    </div>
+                  </div>
                   <div class="model-select-wrap" title="Select downloaded Ollama model">
                     <select id="chat-model-select" class="model-select mono" onchange="selectOllamaModel(this.value)">
                       <option value="">Loading models…</option>
@@ -239,6 +263,9 @@
     </div>
   </div>
 
-  <script src="/app.js"></script>
+  <!-- Floating Bidirectional Citation Hover-Peek Tooltip -->
+  <div class="citation-hover-peek hidden" id="citation-hover-peek" role="tooltip" aria-hidden="true"></div>
+
+  <script src="/app.js?v=5"></script>
 </body>
 </html>
