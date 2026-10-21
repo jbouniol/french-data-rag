@@ -32,7 +32,7 @@ def rule_mask(articles: pd.DataFrame, rule: dict) -> pd.Series:
     if rule.get("number_regex"):
         mask &= articles.number.str.contains(rule["number_regex"], regex=True, na=False, case=False)
     if rule.get("subtitles_regex"):
-        mask &= articles.subtitles.str.contains(rule["subtitles_regex"], regex=True, na=False, case=False)
+        mask &= articles.subtitles.str.contains(rule["subtitles_regex"], regex=True, na=False)
     if rule.get("exclude_subtitles_regex"):
         mask &= ~articles.subtitles.str.contains(rule["exclude_subtitles_regex"], regex=True, na=False, case=False)
     return mask
