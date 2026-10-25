@@ -579,11 +579,23 @@ import threading
 from typing import Callable
 
 _EVENT_LOCAL = threading.local()
+_SEARCH_LOCK = threading.Lock()
 
 
 def set_live_event_callback(cb: Callable[[dict[str, Any]], None] | None) -> None:
     """Register a per-thread callback receiving real-time execution events."""
     _EVENT_LOCAL.callback = cb
+
+
+def set_thread_model(model: str | None) -> None:
+    """Register a per-thread model ID so concurrent Duel requests never race on `llm.MODEL`."""
+    _EVENT_LOCAL.model = str(model).strip() if model else None
+
+
+def get_thread_model() -> str:
+    """Return the per-thread model ID if set, otherwise fall back to `llm.MODEL`."""
+    m = getattr(_EVENT_LOCAL, "model", None)
+    return str(m) if m else llm.MODEL
 
 
 def set_conversation_history(history: list[dict[str, Any]] | None) -> None:
@@ -696,7 +708,7 @@ def _sanitize_final_answer_args(args: dict[str, Any]) -> dict[str, Any]:
 
 def unified_chat(messages: Any, tools: Any = None, schema: Any = None, max_tokens: int = 1024) -> tuple[Any, llm.Usage]:
     """Drop-in replacement for `src.agent.llm.chat` supporting local Ollama, OpenRouter, and Anthropic Direct."""
-    model_id = llm.MODEL
+    model_id = get_thread_model()
     short_model = model_id.split("/")[-1] if "/" in model_id else model_id
 
     # Inject multi-turn <conversation_history> into the user prompt when answering a follow-up question
@@ -760,7 +772,25 @@ def unified_chat(messages: Any, tools: Any = None, schema: Any = None, max_token
     t0 = time.perf_counter()
     provider = get_model_provider(model_id)
     if provider == "local":
-        msg, usage = _ORIGINAL_OLLAMA_CHAT(messages, tools=tools, schema=schema, max_tokens=max_tokens)
+        if model_id == llm.MODEL:
+            msg, usage = _ORIGINAL_OLLAMA_CHAT(messages, tools=tools, schema=schema, max_tokens=max_tokens)
+        else:
+            start_local = time.perf_counter()
+            response = llm.get_client().chat(
+                model=model_id,
+                messages=messages,
+                tools=tools,
+                format=schema,
+                think=False,
+                keep_alive="30m",
+                options={"temperature": 0, "seed": 0, "num_ctx": llm.NUM_CTX, "num_predict": max_tokens},
+            )
+            usage = llm.Usage(
+                response.prompt_eval_count or 0,
+                response.eval_count or 0,
+                (time.perf_counter() - start_local) * 1000,
+            )
+            msg = response.message
     elif provider == "anthropic":
         ant_key = get_anthropic_key()
         if not ant_key:
@@ -857,7 +887,11 @@ def install_llm_bridge() -> None:
                 "detail": _describe_tool_call(name, args),
             })
             t0 = time.perf_counter()
-            out = orig_run_tool(name, args)
+            if name == "search_articles":
+                with _SEARCH_LOCK:
+                    out = orig_run_tool(name, args)
+            else:
+                out = orig_run_tool(name, args)
             elapsed_ms = round((time.perf_counter() - t0) * 1000.0, 1)
             # Wrap compute_remuneration output in <source article="D6222-26"> so small models cite [D6222-26]
             if name == "compute_remuneration" and not out.get("error") and out.get("content"):
@@ -919,11 +953,12 @@ def install_llm_bridge() -> None:
                 "detail": f"Recherche des {k} articles VIGUEUR les plus pertinents",
             })
             t0 = time.perf_counter()
-            hits = (
-                orig_rag_search(effective_query, k=k, filters=filters, **kwargs)
-                if filters is not None
-                else orig_rag_search(effective_query, k=k, **kwargs)
-            )
+            with _SEARCH_LOCK:
+                hits = (
+                    orig_rag_search(effective_query, k=k, filters=filters, **kwargs)
+                    if filters is not None
+                    else orig_rag_search(effective_query, k=k, **kwargs)
+                )
             elapsed_ms = round((time.perf_counter() - t0) * 1000.0, 1)
             nums = [h.metadata.get("num", "") for h in hits if hasattr(h, "metadata")]
             emit_live_event({

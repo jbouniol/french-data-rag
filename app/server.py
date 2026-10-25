@@ -38,11 +38,13 @@ from app.api_llm import (
     get_configured_api_keys,
     get_effective_api_catalog,
     get_model_provider,
+    get_thread_model,
     install_llm_bridge,
     is_api_model,
     save_api_key_to_dotenv,
     set_conversation_history,
     set_live_event_callback,
+    set_thread_model,
 )
 from src.agent import llm
 from src.agent.answer import AnswerTrace, answer
@@ -180,8 +182,15 @@ def resolve_article(id_or_num: str) -> dict[str, Any] | None:
     return None
 
 
-def enrich_trace_payload(question: str, mode: str, trace_dict: dict[str, Any], source_type: str = "live") -> dict[str, Any]:
+def enrich_trace_payload(
+    question: str,
+    mode: str,
+    trace_dict: dict[str, Any],
+    source_type: str = "live",
+    model_override: str | None = None,
+) -> dict[str, Any]:
     """Attach full Légifrance source records and security gate checks to an AnswerTrace dict."""
+    active_model = str(model_override or get_thread_model() or llm.MODEL)
     trace_dict = dict(trace_dict)
     citations: list[str] = list(trace_dict.get("citations") or [])
     retrieved_ids: list[str] = list(trace_dict.get("retrieved_ids") or [])
@@ -219,8 +228,8 @@ def enrich_trace_payload(question: str, mode: str, trace_dict: dict[str, Any], s
 
     tokens_in = int(trace_dict.get("tokens_in") or 0)
     tokens_out = int(trace_dict.get("tokens_out") or 0)
-    if is_api_model(llm.MODEL):
-        trace_dict["cost_eur"] = compute_api_cost_eur(llm.MODEL, tokens_in, tokens_out)
+    if is_api_model(active_model):
+        trace_dict["cost_eur"] = compute_api_cost_eur(active_model, tokens_in, tokens_out)
 
     gates = {
         "xml_isolation": {
@@ -248,8 +257,8 @@ def enrich_trace_payload(question: str, mode: str, trace_dict: dict[str, Any], s
         "question": question,
         "mode": mode,
         "source_type": source_type,
-        "model": llm.MODEL,
-        "is_api_model": is_api_model(llm.MODEL),
+        "model": active_model,
+        "is_api_model": is_api_model(active_model),
         **trace_dict,
         "sources": sources,
         "gates": gates,
@@ -879,8 +888,10 @@ class AlterEgoRequestHandler(SimpleHTTPRequestHandler):
 
     def _handle_ask(self, body: dict[str, Any]) -> None:
         requested_model = str(body.get("model") or "").strip()
-        if requested_model:
+        is_duel = bool(body.get("duel"))
+        if requested_model and not is_duel:
             llm.MODEL = requested_model
+        effective_model = requested_model or llm.MODEL
 
         scenario_id = body.get("instant_scenario_id")
         mode = str(body.get("mode") or "agent")
@@ -895,6 +906,7 @@ class AlterEgoRequestHandler(SimpleHTTPRequestHandler):
                         mode=sc["mode"],
                         trace_dict=sc["instant_trace"],
                         source_type="instant_stage",
+                        model_override=effective_model,
                     )
                     self._send_json(payload)
                     return
@@ -923,19 +935,21 @@ class AlterEgoRequestHandler(SimpleHTTPRequestHandler):
                     pass
 
             try:
-                with _INFERENCE_LOCK:
-                    set_live_event_callback(_emit)
-                    set_conversation_history(history)
-                    try:
-                        trace: AnswerTrace = answer(question, mode=mode)
-                    finally:
-                        set_live_event_callback(None)
-                        set_conversation_history(None)
+                set_live_event_callback(_emit)
+                set_conversation_history(history)
+                set_thread_model(effective_model)
+                try:
+                    trace: AnswerTrace = answer(question, mode=mode)
+                finally:
+                    set_live_event_callback(None)
+                    set_conversation_history(None)
+                    set_thread_model(None)
                 payload = enrich_trace_payload(
                     question=question,
                     mode=mode,
                     trace_dict=asdict(trace),
                     source_type="live_ollama",
+                    model_override=effective_model,
                 )
                 _emit({"type": "final", "data": payload})
             except Exception as err:
@@ -943,17 +957,19 @@ class AlterEgoRequestHandler(SimpleHTTPRequestHandler):
                 _emit({"type": "error", "error": str(err)})
             return
 
-        with _INFERENCE_LOCK:
-            set_conversation_history(history)
-            try:
-                trace = answer(question, mode=mode)
-            finally:
-                set_conversation_history(None)
+        set_conversation_history(history)
+        set_thread_model(effective_model)
+        try:
+            trace = answer(question, mode=mode)
+        finally:
+            set_conversation_history(None)
+            set_thread_model(None)
         payload = enrich_trace_payload(
             question=question,
             mode=mode,
             trace_dict=asdict(trace),
             source_type="live_ollama",
+            model_override=effective_model,
         )
         self._send_json(payload)
 

@@ -1523,6 +1523,7 @@ async function streamSingleDuelContestant({ question, mode, model, history, turn
         model,
         history,
         stream: true,
+        duel: true,
       }),
     });
 
@@ -1840,32 +1841,24 @@ async function executeDuelQuery(payload) {
 
   document.body.classList.add('is-thinking');
   try {
-    const traceA = await streamSingleDuelContestant({
-      question: qText,
-      mode: modeA,
-      model: modelA,
-      history: historyPayload,
-      turnIdx,
-      sideKey: 'a',
-    });
-
-    const traceB = await streamSingleDuelContestant({
-      question: qText,
-      mode: modeB,
-      model: modelB,
-      history: historyPayload,
-      turnIdx,
-      sideKey: 'b',
-    });
-
-    // If modelB changed backend llm.MODEL, restore modelA as the active selected model
-    if (modelB !== modelA) {
-      fetch('/api/model', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: modelA }),
-      }).catch(() => {});
-    }
+    const [traceA, traceB] = await Promise.all([
+      streamSingleDuelContestant({
+        question: qText,
+        mode: modeA,
+        model: modelA,
+        history: historyPayload,
+        turnIdx,
+        sideKey: 'a',
+      }),
+      streamSingleDuelContestant({
+        question: qText,
+        mode: modeB,
+        model: modelB,
+        history: historyPayload,
+        turnIdx,
+        sideKey: 'b',
+      }),
+    ]);
 
     const mergedSources = [];
     const seenDocIds = new Set();
